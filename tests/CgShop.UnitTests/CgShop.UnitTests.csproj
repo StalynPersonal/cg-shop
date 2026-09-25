@@ -11,6 +11,7 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <ProjectReference Include="..\..\src\CgShop.Infrastructure\CgShop.Infrastructure.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -1,0 +1,180 @@
+using CgShop.Application.Orders;
+using CgShop.Application.Tenancy;
+using CgShop.Domain.Catalog;
+using CgShop.Domain.Common;
+using CgShop.Domain.Orders;
+using CgShop.Domain.Tenants;
+using CgShop.Infrastructure.Identity;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace CgShop.Infrastructure.Persistence;
+
+/// <summary>
+/// Datos iniciales de desarrollo: roles, Super Admin y dos tiendas demo (verde y roja)
+/// con catálogo de las 5 categorías y algunas órdenes pendientes de validación.
+/// Idempotente: si ya existen tenants no vuelve a sembrar.
+/// </summary>
+public sealed class DataSeeder(
+    AppDbContext db,
+    UserManager<ApplicationUser> users,
+    RoleManager<IdentityRole> roles,
+    IServiceScopeFactory scopeFactory,
+    ILogger<DataSeeder> logger)
+{
+    public const string SuperAdminEmail = "superadmin@cgshop.local";
+    public const string DemoPassword = "Admin123!";
+
+    public async Task SeedAsync(bool migrate = true, CancellationToken ct = default)
+    {
+        if (migrate)
+            await db.Database.MigrateAsync(ct);
+
+        foreach (var role in Roles.All)
+            if (!await roles.RoleExistsAsync(role))
+                await roles.CreateAsync(new IdentityRole(role));
+
+        if (await users.FindByEmailAsync(SuperAdminEmail) is null)
+            await CreateUserAsync(SuperAdminEmail, "Super Administrador", null, Roles.SuperAdmin);
+
+        if (await db.Tenants.AnyAsync(ct))
+            return;
+
+        await SeedTenantAsync("Tienda Verde", "verde", "#2E7D32", "Banco Popular", ct);
+        await SeedTenantAsync("Tienda Roja", "rojo", "#C62828", "Banco BHD", ct);
+        logger.LogInformation("Datos demo creados: verde.localhost y rojo.localhost (clave {Password})", DemoPassword);
+    }
+
+    private async Task SeedTenantAsync(string name, string slug, string color, string bank, CancellationToken ct)
+    {
+        var tenant = Tenant.Create(name, slug, color, $"ventas@{slug}.local");
+        tenant.UpdatePaymentSettings(new PaymentSettings
+        {
+            BankAccounts =
+            [
+                new BankAccount
+                {
+                    BankName = bank, AccountNumber = slug == "verde" ? "800-123456-7" : "900-765432-1",
+                    AccountHolder = $"{name} SRL", AccountType = "Corriente", HolderDocument = "RNC 1-01-00000-1"
+                }
+            ],
+            PaymentLinkUrl = $"https://pagos.ejemplo.com/{slug}",
+            Instructions = "Envíe el comprobante indicando su número de orden. Validamos pagos en horario laborable."
+        });
+        db.Tenants.Add(tenant);
+        await db.SaveChangesAsync(ct);
+
+        await CreateUserAsync($"admin@{slug}.local", $"Dueño {name}", tenant.Id, Roles.TenantAdmin);
+        await CreateUserAsync($"staff@{slug}.local", $"Empleado {name}", tenant.Id, Roles.TenantStaff);
+
+        // Catálogo y órdenes dentro de un scope con el tenant activo (mismo camino que producción).
+        await using var scope = scopeFactory.CreateAsyncScope();
+        scope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(TenantInfo.From(tenant));
+        var tenantDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var products = DemoCatalog.Build(slug).ToList();
+        tenantDb.Products.AddRange(products);
+        await tenantDb.SaveChangesAsync(ct);
+
+        var checkout = scope.ServiceProvider.GetRequiredService<CheckoutService>();
+        var variants = products.SelectMany(p => p.Variants).ToList();
+        for (var i = 0; i < 3; i++)
+        {
+            await checkout.PlaceOrderAsync(new PlaceOrderRequest
+            {
+                FullName = $"Cliente Demo {i + 1}",
+                Email = $"cliente{i + 1}@correo.com",
+                Phone = $"809-555-000{i}",
+                ShippingAddress = $"Av. Winston Churchill #{10 + i}, Santo Domingo",
+                PaymentMethod = i % 2 == 0 ? PaymentMethod.BankTransfer : PaymentMethod.PaymentLink,
+                Lines = [new CartLine(variants[i * 3].Id, 1), new CartLine(variants[i * 3 + 1].Id, 2)]
+            }, ct);
+        }
+    }
+
+    private async Task CreateUserAsync(string email, string fullName, Guid? tenantId, string role)
+    {
+        var user = new ApplicationUser
+        {
+            UserName = email, Email = email, EmailConfirmed = true, FullName = fullName, TenantId = tenantId
+        };
+        var result = await users.CreateAsync(user, DemoPassword);
+        if (!result.Succeeded)
+            throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
+        await users.AddToRoleAsync(user, role);
+    }
+}
+
+internal static class DemoCatalog
+{
+    public static IEnumerable<Product> Build(string prefix)
+    {
+        var p = prefix.ToUpperInvariant()[..2];
+
+        var polo = Product.Create("Polo Clásico Algodón", ProductCategory.Clothing, "Lacoste",
+            "Polo de algodón piqué, corte regular.", null, new Dictionary<string, string> { ["Material"] = "Algodón piqué" });
+        foreach (var (size, i) in new[] { "S", "M", "L", "XL" }.Select((s, i) => (s, i)))
+        {
+            polo.AddVariant($"{p}-POLO-BL-{size}", 2450, 10 + i, size, "Blanco");
+            polo.AddVariant($"{p}-POLO-NG-{size}", 2450, 8 + i, size, "Negro");
+        }
+
+        var jeans = Product.Create("Jeans Slim Fit", ProductCategory.Clothing, "Levi's",
+            "Denim elástico de tiro medio.", null, new Dictionary<string, string> { ["Material"] = "Denim 98% algodón" });
+        foreach (var size in new[] { "28", "30", "32", "34", "36" })
+            jeans.AddVariant($"{p}-JEAN-AZ-{size}", 3200, 6, size, "Azul");
+
+        var gorra = Product.Create("Gorra 9FORTY Yankees", ProductCategory.Caps, "New Era",
+            "Gorra ajustable bordada.", null);
+        gorra.AddVariant($"{p}-CAP-NG", 1850, 15, "Ajustable", "Negro");
+        gorra.AddVariant($"{p}-CAP-AZ", 1850, 12, "Ajustable", "Azul marino");
+
+        var gorraTrucker = Product.Create("Gorra Trucker Malla", ProductCategory.Caps, "Adidas", "Transpirable.", null);
+        gorraTrucker.AddVariant($"{p}-TRK-SM", 1450, 9, "S/M", "Gris");
+        gorraTrucker.AddVariant($"{p}-TRK-LX", 1450, 7, "L/XL", "Gris");
+
+        var reloj = Product.Create("Reloj G-Shock GA-2100", ProductCategory.Watches, "Casio",
+            "Resistente a golpes, 200 m.", null,
+            new Dictionary<string, string> { ["Movimiento"] = "Cuarzo", ["Resistencia"] = "200 m", ["Caja"] = "45 mm" });
+        reloj.AddVariant($"{p}-GSH-NG", 8900, 5, color: "Negro");
+        reloj.AddVariant($"{p}-GSH-VE", 8900, 3, color: "Verde oliva");
+
+        var relojAuto = Product.Create("Reloj Presage Automático", ProductCategory.Watches, "Seiko",
+            "Esfera coctel, cristal zafiro.", null,
+            new Dictionary<string, string> { ["Movimiento"] = "Automático 4R35", ["Resistencia"] = "50 m" });
+        relojAuto.AddVariant($"{p}-PRS-AZ", 24500, 2, color: "Azul");
+
+        var perfume = Product.Create("Sauvage Eau de Parfum", ProductCategory.Perfumes, "Dior",
+            "Fragancia amaderada aromática.", null, new Dictionary<string, string>
+            {
+                ["NotasSalida"] = "Bergamota de Calabria", ["NotasCorazon"] = "Lavanda, Anís estrellado",
+                ["NotasFondo"] = "Ambroxan, Vainilla", ["Concentracion"] = "EDP"
+            });
+        perfume.AddVariant($"{p}-SAU-60", 6900, 6, volumeMl: 60);
+        perfume.AddVariant($"{p}-SAU-100", 9400, 4, volumeMl: 100);
+
+        var perfume2 = Product.Create("Coco Mademoiselle", ProductCategory.Perfumes, "Chanel",
+            "Oriental fresco femenino.", null, new Dictionary<string, string>
+            {
+                ["NotasSalida"] = "Naranja, Bergamota", ["NotasCorazon"] = "Rosa, Jazmín", ["NotasFondo"] = "Pachulí, Vetiver"
+            });
+        perfume2.AddVariant($"{p}-COC-50", 8200, 5, volumeMl: 50);
+        perfume2.AddVariant($"{p}-COC-100", 11900, 3, volumeMl: 100);
+
+        var tenis = Product.Create("Tenis Air Max 90", ProductCategory.Footwear, "Nike",
+            "Amortiguación Air visible.", null, new Dictionary<string, string> { ["Material"] = "Cuero y malla" });
+        foreach (var size in new[] { "38", "39", "40", "41", "42", "43", "44" })
+        {
+            tenis.AddVariant($"{p}-AM90-BL-{size}", 7800, 4, size, "Blanco");
+            tenis.AddVariant($"{p}-AM90-NG-{size}", 7800, 3, size, "Negro");
+        }
+
+        var botas = Product.Create("Botas Chelsea Cuero", ProductCategory.Footwear, "Timberland", "Cuero genuino.", null);
+        foreach (var size in new[] { "40", "41", "42", "43" })
+            botas.AddVariant($"{p}-CHL-MR-{size}", 9800, 2, size, "Marrón");
+
+        return [polo, jeans, gorra, gorraTrucker, reloj, relojAuto, perfume, perfume2, tenis, botas];
+    }
+}
