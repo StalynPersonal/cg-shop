@@ -1,0 +1,54 @@
+@page "/admin"
+@inject OrderAdminService Orders
+
+<PageTitle>Resumen · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Resumen</MudText>
+
+@if (_dashboard is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    @if (_dashboard.PendingValidation > 0)
+    {
+        <MudAlert Severity="Severity.Warning" Class="mb-4" Variant="Variant.Filled">
+            Tienes <b>@_dashboard.PendingValidation</b> pedido(s) esperando validación de pago.
+            <MudLink Href="/admin/pagos" Color="Color.Inherit" Underline="Underline.Always" Class="ml-2">Revisar ahora</MudLink>
+        </MudAlert>
+    }
+    <MudGrid Spacing="3" Class="mb-6">
+        <StatCard Md="3" Title="Pagos por validar" Value="@_dashboard.PendingValidation.ToString()" Color="Color.Warning"
+                  Icon="@Icons.Material.Filled.FactCheck" Href="/admin/pagos" />
+        <StatCard Md="3" Title="Por preparar" Value="@_dashboard.ToPrepare.ToString()" Color="Color.Info"
+                  Icon="@Icons.Material.Filled.Inventory" Href="/admin/pedidos" />
+        <StatCard Md="3" Title="Enviados" Value="@_dashboard.Shipped.ToString()" Color="Color.Secondary"
+                  Icon="@Icons.Material.Filled.LocalShipping" />
+        <StatCard Md="3" Title="Ventas validadas" Value="@Ui.Money(_dashboard.ValidatedRevenue, Currency)" Color="Color.Success"
+                  Icon="@Icons.Material.Filled.Payments" />
+        <StatCard Md="3" Title="Pedidos hoy" Value="@_dashboard.OrdersToday.ToString()" Icon="@Icons.Material.Filled.Today" />
+        <StatCard Md="3" Title="Productos activos" Value="@_dashboard.ActiveProducts.ToString()"
+                  Icon="@Icons.Material.Filled.Inventory2" Href="/admin/productos" />
+        <StatCard Md="3" Title="Variantes con poco stock" Value="@_dashboard.LowStockVariants.ToString()" Color="Color.Error"
+                  Icon="@Icons.Material.Filled.Warning" Href="/admin/inventario" />
+    </MudGrid>
+
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.h6" Class="mb-2">Pedidos por estado</MudText>
+        <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="2">
+            @foreach (var status in Enum.GetValues<OrderStatus>())
+            {
+                <MudBadge Content="@_dashboard.ByStatus.GetValueOrDefault(status)" Color="Color.Dark" Overlap="true">
+                    <MudButton Href="@($"/admin/pedidos?estado={status}")" Variant="Variant.Outlined" Color="@Ui.StatusColor(status)"
+                               StartIcon="@Ui.StatusIcon(status)" Size="Size.Small">@status.DisplayName()</MudButton>
+                </MudBadge>
+            }
+        </MudStack>
+    </MudPaper>
+}
+
+@code {
+    private DashboardDto? _dashboard;
+
+    protected override async Task OnAdminInitializedAsync() => _dashboard = await Orders.GetDashboardAsync();
+}

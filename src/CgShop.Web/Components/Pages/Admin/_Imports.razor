@@ -1,0 +1,4 @@
+@layout AdminLayout
+@attribute [TenantHost]
+@attribute [Authorize(Policy = Policies.TenantStaff)]
+@inherits AdminPageBase

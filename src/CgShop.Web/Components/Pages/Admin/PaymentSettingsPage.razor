@@ -1,0 +1,68 @@
+@page "/admin/configuracion"
+@attribute [Authorize(Policy = Policies.TenantAdmin)]
+@inject TenantSettingsService Settings
+
+<PageTitle>Datos de pago · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4">Datos de pago</MudText>
+<MudText Color="Color.Secondary" Class="mb-4">
+    Estos datos se muestran al cliente al finalizar la compra. Sin cuentas bancarias ni enlace, la tienda no puede recibir pedidos.
+</MudText>
+
+@if (_settings is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Cuentas para transferencia</MudText>
+                @foreach (var account in _settings.BankAccounts)
+                {
+                    <MudPaper Class="pa-3 mb-3" Outlined="true">
+                        <MudGrid Spacing="1">
+                            <MudItem xs="12" sm="6"><MudTextField @bind-Value="account.BankName" Label="Banco" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                            <MudItem xs="12" sm="6"><MudTextField @bind-Value="account.AccountNumber" Label="Número de cuenta" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                            <MudItem xs="12" sm="6"><MudTextField @bind-Value="account.AccountHolder" Label="Titular" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                            <MudItem xs="6" sm="3">
+                                <MudSelect @bind-Value="account.AccountType" Label="Tipo" Variant="Variant.Outlined" Margin="Margin.Dense">
+                                    <MudSelectItem Value="@("Corriente")">Corriente</MudSelectItem>
+                                    <MudSelectItem Value="@("Ahorros")">Ahorros</MudSelectItem>
+                                </MudSelect>
+                            </MudItem>
+                            <MudItem xs="6" sm="3"><MudTextField @bind-Value="account.HolderDocument" Label="RNC/Cédula" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                        </MudGrid>
+                        <MudButton Color="Color.Error" Size="Size.Small" StartIcon="@Icons.Material.Filled.Delete"
+                                   OnClick="() => _settings.BankAccounts.Remove(account)">Quitar cuenta</MudButton>
+                    </MudPaper>
+                }
+                <MudButton StartIcon="@Icons.Material.Filled.Add" Variant="Variant.Outlined" Color="Color.Primary"
+                           OnClick="() => _settings.BankAccounts.Add(new BankAccount())">Agregar cuenta</MudButton>
+
+                <MudText Typo="Typo.h6" Class="mt-6 mb-2">Enlace de pago externo</MudText>
+                <MudTextField @bind-Value="_settings.PaymentLinkUrl" Label="URL https del enlace de pago (opcional)"
+                              Variant="Variant.Outlined" Placeholder="https://..." />
+
+                <MudText Typo="Typo.h6" Class="mt-6 mb-2">Instrucciones adicionales</MudText>
+                <MudTextField @bind-Value="_settings.Instructions" Label="Mensaje para el cliente" Lines="3"
+                              Variant="Variant.Outlined" MaxLength="2000" />
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="Save">Guardar</MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private PaymentSettings? _settings;
+
+    protected override async Task OnAdminInitializedAsync() => _settings = await Settings.GetPaymentSettingsAsync();
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(_settings!.PaymentLinkUrl))
+            _settings.PaymentLinkUrl = null;
+        await Snackbar.TryAsync(() => Settings.UpdatePaymentSettingsAsync(_settings, Actor), "Datos de pago guardados.");
+    }
+}

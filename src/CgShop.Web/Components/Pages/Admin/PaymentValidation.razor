@@ -1,0 +1,106 @@
+@page "/admin/pagos"
+@inject OrderAdminService Orders
+
+<PageTitle>Pagos por validar · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4">Pagos por validar</MudText>
+<MudText Color="Color.Secondary" Class="mb-4">
+    Las órdenes no se procesan ni se despachan hasta que el propietario confirme el pago revisando el comprobante
+    o su cuenta bancaria. El stock está apartado hasta la fecha límite.
+</MudText>
+
+@if (_orders is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_orders.Items.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Filled.TaskAlt" Title="No hay pagos pendientes" Message="¡Todo al día!" />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var order in _orders.Items)
+        {
+            <MudItem xs="12" md="6" lg="4">
+                <MudCard Outlined="true" data-testid="pending-order">
+                    <MudCardHeader>
+                        <CardHeaderContent>
+                            <MudText Typo="Typo.h6">#@order.Number</MudText>
+                            <MudText Typo="Typo.body2">@order.CustomerName · @order.CustomerEmail</MudText>
+                        </CardHeaderContent>
+                        <CardHeaderActions>
+                            <MudChip T="string" Size="Size.Small" Color="@(order.ReceiptCount > 0 ? Color.Success : Color.Default)"
+                                     Icon="@Icons.Material.Filled.AttachFile">
+                                @(order.ReceiptCount > 0 ? $"{order.ReceiptCount} comprobante(s)" : "Sin comprobante")
+                            </MudChip>
+                        </CardHeaderActions>
+                    </MudCardHeader>
+                    <MudCardContent>
+                        <MudText Typo="Typo.h5" Color="Color.Primary">@Ui.Money(order.Total, Currency)</MudText>
+                        <MudText Typo="Typo.body2">@order.PaymentMethod.DisplayName() · @order.ItemCount artículo(s)</MudText>
+                        <MudText Typo="Typo.caption" Color="@(order.ReservationExpiresAtUtc < DateTime.UtcNow.AddHours(6) ? Color.Error : Color.Secondary)">
+                            Creado @Ui.Date(order.CreatedAtUtc) · Reserva hasta @Ui.Date(order.ReservationExpiresAtUtc)
+                        </MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        <MudButton Href="@($"/admin/pedidos/{order.Id}")" Variant="Variant.Text">Ver detalle</MudButton>
+                        <MudSpacer />
+                        <AuthorizeView Policy="@Policies.TenantAdmin">
+                            <MudButton Color="Color.Error" OnClick="() => Reject(order)">Rechazar</MudButton>
+                            <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Verified"
+                                       OnClick="() => Validate(order)" data-testid="validate-payment">Validar pago</MudButton>
+                        </AuthorizeView>
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+    @if (_orders.TotalPages > 1)
+    {
+        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+            <MudPagination Count="_orders.TotalPages" Selected="_page" SelectedChanged="ChangePage" Color="Color.Primary" />
+        </MudStack>
+    }
+    <AuthorizeView Policy="@Policies.TenantAdmin">
+        <NotAuthorized>
+            <MudAlert Severity="Severity.Info" Class="mt-4">Solo el propietario/administrador de la tienda puede validar pagos.</MudAlert>
+        </NotAuthorized>
+    </AuthorizeView>
+}
+
+@code {
+    private PagedResult<OrderRowDto>? _orders;
+    private int _page = 1;
+
+    protected override Task OnAdminInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync() =>
+        _orders = await Orders.ListAsync(new OrderQuery(OrderStatus.PendingPaymentValidation, Page: _page, PageSize: 12));
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private async Task Validate(OrderRowDto order)
+    {
+        var note = await TextPromptDialog.AskAsync(Dialogs, $"Validar pago de #{order.Number}",
+            "Nota (ej. referencia bancaria verificada)", false, "Validar pago", Color.Success,
+            $"Confirma que recibiste {Ui.Money(order.Total, Currency)}. El stock apartado se descontará definitivamente.");
+        if (note is null)
+            return;
+        if (await Snackbar.TryAsync(() => Orders.ValidatePaymentAsync(order.Id, Actor, note), $"Pago de #{order.Number} validado."))
+            await LoadAsync();
+    }
+
+    private async Task Reject(OrderRowDto order)
+    {
+        var reason = await TextPromptDialog.AskAsync(Dialogs, $"Rechazar pago de #{order.Number}", "Motivo del rechazo",
+            true, "Rechazar", Color.Error, "El stock apartado se liberará y el cliente verá el motivo.");
+        if (reason is null)
+            return;
+        if (await Snackbar.TryAsync(() => Orders.RejectPaymentAsync(order.Id, Actor, reason), $"Pago de #{order.Number} rechazado."))
+            await LoadAsync();
+    }
+}

@@ -1,0 +1,109 @@
+@page "/admin/productos"
+@inject ProductAdminService Products
+
+<PageTitle>Productos · @Host.Tenant?.Name</PageTitle>
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4">Productos</MudText>
+    <MudButton Href="/admin/productos/nuevo" Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.Add">Nuevo producto</MudButton>
+</MudStack>
+
+<MudDataGrid T="ProductAdminRowDto" @ref="_grid" ServerData="LoadServerData" Hover="true" Dense="true" Elevation="1"
+             RowsPerPage="25">
+    <ToolBarContent>
+        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="Nombre, marca o SKU"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                          Style="min-width:260px" />
+            <MudSelect T="ProductCategory?" Value="_category" ValueChanged="OnCategory" Label="Categoría" Clearable="true"
+                       Style="max-width:240px">
+                @foreach (var c in Enum.GetValues<ProductCategory>())
+                {
+                    <MudSelectItem T="ProductCategory?" Value="c">@c.DisplayName()</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x => x.Name" Title="Producto" Sortable="false" />
+        <PropertyColumn Property="x => x.Brand" Title="Marca" Sortable="false" />
+        <TemplateColumn Title="Categoría" Sortable="false">
+            <CellTemplate>
+                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                    <MudIcon Icon="@Ui.CategoryIcon(context.Item.Category)" Size="Size.Small" />
+                    <span>@context.Item.Category.DisplayName()</span>
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.VariantCount" Title="Variantes" Sortable="false" />
+        <TemplateColumn Title="Stock (reservado)" Sortable="false">
+            <CellTemplate>@context.Item.StockOnHand (@context.Item.StockReserved)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Desde" Sortable="false">
+            <CellTemplate>@(context.Item.MinPrice is { } p ? Ui.Money(p, Currency) : "—")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Activo" Sortable="false">
+            <CellTemplate>
+                <MudSwitch T="bool" Value="context.Item.IsActive" Color="Color.Primary"
+                           ValueChanged="v => ToggleActive(context.Item, v)" />
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Sortable="false">
+            <CellTemplate>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit" Href="@($"/admin/productos/{context.Item.Id}")" Size="Size.Small"
+                               aria-label="Editar" />
+                <AuthorizeView Policy="@Policies.TenantAdmin" Context="auth">
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error" Size="Size.Small"
+                                   OnClick="() => Delete(context.Item)" aria-label="Eliminar" />
+                </AuthorizeView>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>No hay productos.</MudText></NoRecordsContent>
+    <PagerContent><MudDataGridPager T="ProductAdminRowDto" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    private MudDataGrid<ProductAdminRowDto> _grid = default!;
+    private string? _search;
+    private ProductCategory? _category;
+
+    private async Task<GridData<ProductAdminRowDto>> LoadServerData(GridState<ProductAdminRowDto> state, CancellationToken ct)
+    {
+        var result = await Products.ListAsync(_search, _category, state.Page + 1, state.PageSize, ct);
+        return new GridData<ProductAdminRowDto> { Items = result.Items, TotalItems = result.TotalCount };
+    }
+
+    private Task OnSearch(string? value)
+    {
+        _search = value;
+        return _grid.ReloadServerData();
+    }
+
+    private Task OnCategory(ProductCategory? value)
+    {
+        _category = value;
+        return _grid.ReloadServerData();
+    }
+
+    private async Task ToggleActive(ProductAdminRowDto row, bool active)
+    {
+        if (await Snackbar.TryAsync(() => Products.SetActiveAsync(row.Id, active, Actor),
+                active ? "Producto publicado." : "Producto oculto de la tienda."))
+            await _grid.ReloadServerData();
+    }
+
+    private async Task Delete(ProductAdminRowDto row)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Eliminar producto",
+            $"¿Eliminar '{row.Name}'? Si tiene ventas se desactivará en lugar de borrarse.", "Eliminar", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
+        var removed = false;
+        if (await Snackbar.TryAsync(async () => removed = await Products.DeleteAsync(row.Id, Actor)))
+        {
+            Snackbar.Add(removed ? "Producto eliminado." : "El producto tiene ventas: se desactivó.", Severity.Info);
+            await _grid.ReloadServerData();
+        }
+    }
+}

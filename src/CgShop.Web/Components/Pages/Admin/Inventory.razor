@@ -1,0 +1,80 @@
+@page "/admin/inventario"
+@inject ProductAdminService Products
+
+<PageTitle>Inventario · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4">Inventario</MudText>
+<MudText Color="Color.Secondary" Class="mb-4">
+    <b>Disponible</b> = stock físico − reservado por pedidos pendientes de validación de pago.
+</MudText>
+
+<MudDataGrid T="InventoryRowDto" Items="_rows" Loading="_rows is null" Dense="true" Hover="true" Elevation="1"
+             QuickFilter="QuickFilter" RowsPerPage="50" SortMode="SortMode.Single">
+    <ToolBarContent>
+        <MudStack Row="true" Spacing="3" Style="width:100%" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+            <MudTextField @bind-Value="_search" Placeholder="SKU o producto" Adornment="Adornment.Start" Immediate="true"
+                          AdornmentIcon="@Icons.Material.Filled.Search" Style="min-width:240px" />
+            <MudSwitch T="bool" @bind-Value="_lowOnly" Color="Color.Warning" Label="Solo poco stock (≤ 5)" />
+            <MudSpacer />
+            <MudButton StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">Actualizar</MudButton>
+        </MudStack>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x => x.Sku" Title="SKU" />
+        <PropertyColumn Property="x => x.ProductName" Title="Producto" />
+        <PropertyColumn Property="x => x.Description" Title="Variante" Sortable="false" />
+        <PropertyColumn Property="x => x.StockOnHand" Title="Físico" />
+        <PropertyColumn Property="x => x.StockReserved" Title="Reservado" />
+        <TemplateColumn Title="Disponible" SortBy="x => x.Available">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small" Color="@(context.Item.Available <= 0 ? Color.Error : context.Item.Available <= 5 ? Color.Warning : Color.Success)">
+                    @context.Item.Available
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Ajustar" Sortable="false">
+            <CellTemplate>
+                <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+                    <MudNumericField T="int" @bind-Value="_deltas[context.Item.VariantId]" Variant="Variant.Text"
+                                     Margin="Margin.Dense" Style="max-width:90px" />
+                    <MudIconButton Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Primary"
+                                   OnClick="() => Adjust(context.Item)" aria-label="Aplicar ajuste" />
+                </MudStack>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent><MudDataGridPager T="InventoryRowDto" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    private IReadOnlyList<InventoryRowDto>? _rows;
+    private Dictionary<Guid, int> _deltas = [];
+    private string? _search;
+    private bool _lowOnly;
+
+    private Func<InventoryRowDto, bool> QuickFilter => r =>
+        (!_lowOnly || r.Available <= 5) &&
+        (string.IsNullOrWhiteSpace(_search) ||
+         r.Sku.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+         r.ProductName.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    protected override Task OnAdminInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _rows = await Products.GetInventoryAsync();
+        _deltas = _rows.ToDictionary(r => r.VariantId, _ => 0);
+    }
+
+    private async Task Adjust(InventoryRowDto row)
+    {
+        var delta = _deltas[row.VariantId];
+        if (delta == 0)
+            return;
+        var reason = await TextPromptDialog.AskAsync(Dialogs, $"Ajustar {row.Sku} ({(delta > 0 ? "+" : "")}{delta})",
+            "Motivo (compra, merma, conteo...)", true, "Aplicar", Color.Primary);
+        if (reason is null)
+            return;
+        if (await Snackbar.TryAsync(() => Products.AdjustStockAsync(row.VariantId, delta, reason, Actor), $"Stock de {row.Sku} ajustado."))
+            await LoadAsync();
+    }
+}

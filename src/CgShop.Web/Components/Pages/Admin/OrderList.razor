@@ -1,0 +1,80 @@
+@page "/admin/pedidos"
+@inject OrderAdminService Orders
+
+<PageTitle>Pedidos · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Pedidos</MudText>
+
+<MudDataGrid T="OrderRowDto" @ref="_grid" ServerData="LoadServerData" Hover="true" Dense="true" Elevation="1"
+             RowClick="@(e => Navigation.NavigateTo($"/admin/pedidos/{e.Item.Id}"))" RowStyle="cursor:pointer"
+             RowsPerPage="25">
+    <ToolBarContent>
+        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="Número, cliente o correo"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                          Style="min-width:260px" />
+            <MudSelect T="OrderStatus?" Value="_status" ValueChanged="OnStatus" Label="Estado" Clearable="true"
+                       Style="max-width:280px">
+                @foreach (var s in Enum.GetValues<OrderStatus>())
+                {
+                    <MudSelectItem T="OrderStatus?" Value="s">@s.DisplayName()</MudSelectItem>
+                }
+            </MudSelect>
+        </MudStack>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x => x.Number" Title="Pedido" Sortable="false" />
+        <PropertyColumn Property="x => x.CustomerName" Title="Cliente" Sortable="false" />
+        <TemplateColumn Title="Estado" Sortable="false">
+            <CellTemplate><OrderStatusChip Status="context.Item.Status" /></CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Pago" Sortable="false">
+            <CellTemplate>
+                @context.Item.PaymentMethod.DisplayName()
+                @if (context.Item.ReceiptCount > 0)
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" Title="Tiene comprobante" />
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Total" Sortable="false">
+            <CellTemplate>@Ui.Money(context.Item.Total, Currency)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Fecha" Sortable="false">
+            <CellTemplate>@Ui.Date(context.Item.CreatedAtUtc)</CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>No hay pedidos con estos filtros.</MudText></NoRecordsContent>
+    <PagerContent><MudDataGridPager T="OrderRowDto" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    [SupplyParameterFromQuery(Name = "estado")] public string? StatusQuery { get; set; }
+
+    private MudDataGrid<OrderRowDto> _grid = default!;
+    private string? _search;
+    private OrderStatus? _status;
+
+    protected override void OnParametersSet()
+    {
+        if (Enum.TryParse<OrderStatus>(StatusQuery, out var s))
+            _status = s;
+    }
+
+    private async Task<GridData<OrderRowDto>> LoadServerData(GridState<OrderRowDto> state, CancellationToken ct)
+    {
+        var result = await Orders.ListAsync(new OrderQuery(_status, _search, state.Page + 1, state.PageSize), ct);
+        return new GridData<OrderRowDto> { Items = result.Items, TotalItems = result.TotalCount };
+    }
+
+    private Task OnSearch(string? value)
+    {
+        _search = value;
+        return _grid.ReloadServerData();
+    }
+
+    private Task OnStatus(OrderStatus? value)
+    {
+        _status = value;
+        return _grid.ReloadServerData();
+    }
+}

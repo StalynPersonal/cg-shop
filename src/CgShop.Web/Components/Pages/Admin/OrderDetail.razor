@@ -1,0 +1,214 @@
+@page "/admin/pedidos/{Id:guid}"
+@inject OrderAdminService Orders
+
+@if (_order is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <PageTitle>Pedido #@_order.Number · @Host.Tenant?.Name</PageTitle>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/admin/pedidos" aria-label="Volver" />
+            <MudText Typo="Typo.h4">Pedido #@_order.Number</MudText>
+            <OrderStatusChip Status="_order.Status" Size="Size.Medium" />
+        </MudStack>
+        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+            @if (_order.Status == OrderStatus.PendingPaymentValidation)
+            {
+                <AuthorizeView Policy="@Policies.TenantAdmin">
+                    <Authorized>
+                        <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="Reject">Rechazar pago</MudButton>
+                        <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Verified"
+                                   OnClick="Validate">Validar pago</MudButton>
+                    </Authorized>
+                    <NotAuthorized>
+                        <MudChip T="string" Color="Color.Warning">Solo el propietario puede validar el pago</MudChip>
+                    </NotAuthorized>
+                </AuthorizeView>
+            }
+            @if (_order.NextStatuses.Contains(OrderStatus.Preparing))
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Inventory"
+                           OnClick="Prepare">Pasar a preparación</MudButton>
+            }
+            @if (_order.NextStatuses.Contains(OrderStatus.Shipped))
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.LocalShipping"
+                           OnClick="Ship">Marcar enviado</MudButton>
+            }
+            @if (_order.NextStatuses.Contains(OrderStatus.Delivered))
+            {
+                <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CheckCircle"
+                           OnClick="Deliver">Marcar entregado</MudButton>
+            }
+            @if (_order.NextStatuses.Contains(OrderStatus.Cancelled))
+            {
+                <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="Cancel">Cancelar pedido</MudButton>
+            }
+        </MudStack>
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-4 mb-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Comprobantes de pago</MudText>
+                @if (_order.Receipts.Count == 0)
+                {
+                    <MudText Color="Color.Secondary">
+                        El cliente no ha subido comprobante. Verifica el ingreso directamente en tu cuenta
+                        (@_order.PaymentMethod.DisplayName()) antes de validar.
+                    </MudText>
+                }
+                @foreach (var receipt in _order.Receipts)
+                {
+                    <MudPaper Class="pa-3 mb-3" Outlined="true">
+                        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+                            <MudText>
+                                <MudIcon Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small" />
+                                @receipt.FileName · @Ui.FileSize(receipt.SizeBytes) · @Ui.Date(receipt.UploadedAtUtc)
+                                @if (receipt.Reference is not null)
+                                {
+                                    <b> · Ref: @receipt.Reference</b>
+                                }
+                            </MudText>
+                            <MudStack Row="true" Spacing="1">
+                                <MudButton Href="@($"/admin/comprobantes/{receipt.Id}")" Target="_blank" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.OpenInNew">Abrir</MudButton>
+                                <MudButton Href="@($"/admin/comprobantes/{receipt.Id}?download=true")" Target="_blank" Size="Size.Small"
+                                           StartIcon="@Icons.Material.Filled.Download">Descargar</MudButton>
+                            </MudStack>
+                        </MudStack>
+                        @if (receipt.ContentType.StartsWith("image/"))
+                        {
+                            <img src="@($"/admin/comprobantes/{receipt.Id}")" alt="Comprobante" class="cg-receipt-preview mt-2" />
+                        }
+                    </MudPaper>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Productos</MudText>
+                <MudSimpleTable Dense="true">
+                    <thead><tr><th>SKU</th><th>Producto</th><th>Cant.</th><th style="text-align:right">Importe</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in _order.Items)
+                    {
+                        <tr>
+                            <td>@item.Sku</td>
+                            <td>@item.ProductName<br /><small>@item.VariantDescription</small></td>
+                            <td>@item.Quantity × @Ui.Money(item.UnitPrice, _order.Currency)</td>
+                            <td style="text-align:right">@Ui.Money(item.LineTotal, _order.Currency)</td>
+                        </tr>
+                    }
+                    <tr><td colspan="3">Subtotal</td><td style="text-align:right">@Ui.Money(_order.Subtotal, _order.Currency)</td></tr>
+                    <tr><td colspan="3">ITBIS</td><td style="text-align:right">@Ui.Money(_order.Tax, _order.Currency)</td></tr>
+                    <tr><td colspan="3"><b>Total</b></td><td style="text-align:right"><b>@Ui.Money(_order.Total, _order.Currency)</b></td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4 mb-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Cliente</MudText>
+                <MudText><b>@_order.CustomerName</b></MudText>
+                <MudText>@_order.CustomerEmail · @_order.CustomerPhone</MudText>
+                <MudText>@_order.ShippingAddress</MudText>
+                <MudDivider Class="my-2" />
+                <MudText Typo="Typo.body2">Método: @_order.PaymentMethod.DisplayName()</MudText>
+                <MudText Typo="Typo.body2">Creado: @Ui.Date(_order.CreatedAtUtc)</MudText>
+                @if (_order.Status == OrderStatus.PendingPaymentValidation)
+                {
+                    <MudText Typo="Typo.body2">Stock apartado hasta: @Ui.Date(_order.ReservationExpiresAtUtc)</MudText>
+                }
+                @if (_order.PaymentValidatedAtUtc is { } validatedAt)
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Success">
+                        Pago validado por @_order.PaymentValidatedBy el @Ui.Date(validatedAt)
+                    </MudText>
+                }
+            </MudPaper>
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Auditoría</MudText>
+                <MudTimeline TimelinePosition="TimelinePosition.Start" Class="pa-0">
+                    @foreach (var h in _order.History.Reverse())
+                    {
+                        <MudTimelineItem Color="@Ui.StatusColor(h.To)" Size="Size.Small">
+                            <MudText Typo="Typo.subtitle2">
+                                @(h.From is { } from && from != h.To ? $"{from.DisplayName()} → " : "")@h.To.DisplayName()
+                            </MudText>
+                            <MudText Typo="Typo.caption">@Ui.Date(h.AtUtc) · @h.ChangedBy</MudText>
+                            @if (h.Note is not null)
+                            {
+                                <MudText Typo="Typo.body2">@h.Note</MudText>
+                            }
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    private OrderDetailDto? _order;
+
+    protected override Task OnAdminInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _order = await Orders.GetAsync(Id);
+        }
+        catch (NotFoundException)
+        {
+            Navigation.NavigateTo("/not-found");
+        }
+    }
+
+    private async Task Run(Func<Task> action, string message)
+    {
+        if (await Snackbar.TryAsync(action, message))
+            await LoadAsync();
+    }
+
+    private async Task Validate()
+    {
+        var note = await TextPromptDialog.AskAsync(Dialogs, "Validar pago", "Nota (opcional)", false, "Validar pago",
+            Color.Success, $"Confirma que recibiste {Ui.Money(_order!.Total, _order.Currency)}.");
+        if (note is not null)
+            await Run(() => Orders.ValidatePaymentAsync(Id, Actor, note), "Pago validado.");
+    }
+
+    private async Task Reject()
+    {
+        var reason = await TextPromptDialog.AskAsync(Dialogs, "Rechazar pago", "Motivo", true, "Rechazar", Color.Error,
+            "El stock apartado se liberará.");
+        if (reason is not null)
+            await Run(() => Orders.RejectPaymentAsync(Id, Actor, reason), "Pago rechazado.");
+    }
+
+    private Task Prepare() => Run(() => Orders.StartPreparingAsync(Id, Actor), "Pedido en preparación.");
+
+    private async Task Ship()
+    {
+        var tracking = await TextPromptDialog.AskAsync(Dialogs, "Marcar como enviado", "Transportista / guía (opcional)",
+            false, "Marcar enviado", Color.Primary);
+        if (tracking is not null)
+            await Run(() => Orders.ShipAsync(Id, Actor, string.IsNullOrWhiteSpace(tracking) ? null : tracking),
+                "Pedido marcado como enviado.");
+    }
+
+    private Task Deliver() => Run(() => Orders.MarkDeliveredAsync(Id, Actor), "Pedido entregado.");
+
+    private async Task Cancel()
+    {
+        var reason = await TextPromptDialog.AskAsync(Dialogs, "Cancelar pedido", "Motivo", true, "Cancelar pedido",
+            Color.Error, "El stock se devolverá al inventario.");
+        if (reason is not null)
+            await Run(() => Orders.CancelAsync(Id, Actor, reason), "Pedido cancelado.");
+    }
+}

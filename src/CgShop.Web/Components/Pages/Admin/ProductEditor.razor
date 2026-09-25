@@ -1,0 +1,257 @@
+@page "/admin/productos/nuevo"
+@page "/admin/productos/{Id:guid}"
+@inject ProductAdminService Products
+
+<PageTitle>@(IsNew ? "Nuevo producto" : _product.Name) · @Host.Tenant?.Name</PageTitle>
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/admin/productos" aria-label="Volver" />
+    <MudText Typo="Typo.h4">@(IsNew ? "Nuevo producto" : "Editar producto")</MudText>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudForm @ref="_form" @bind-IsValid="_valid">
+                    <MudStack Spacing="3">
+                        <MudTextField @bind-Value="_product.Name" Label="Nombre" Required="true" RequiredError="Requerido"
+                                      Variant="Variant.Outlined" MaxLength="200" />
+                        <MudSelect T="ProductCategory" @bind-Value="_product.Category" Label="Categoría" Variant="Variant.Outlined"
+                                   Disabled="@(!IsNew)" HelperText="@(IsNew ? null : "La categoría no puede cambiarse")">
+                            @foreach (var c in Enum.GetValues<ProductCategory>())
+                            {
+                                <MudSelectItem Value="c">@c.DisplayName()</MudSelectItem>
+                            }
+                        </MudSelect>
+                        <MudTextField @bind-Value="_product.Brand" Label="Marca" Variant="Variant.Outlined" MaxLength="100" />
+                        <MudTextField @bind-Value="_product.Description" Label="Descripción" Lines="4" Variant="Variant.Outlined" MaxLength="4000" />
+                        <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen" Variant="Variant.Outlined" />
+
+                        <MudText Typo="Typo.subtitle1" Class="mt-2">Atributos de @_product.Category.DisplayName()</MudText>
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@AttributeHint</MudText>
+                        @foreach (var key in _product.Attributes.Keys.ToList())
+                        {
+                            <MudStack Row="true" AlignItems="AlignItems.Center">
+                                <MudTextField T="string" Value="key" Label="Atributo" ReadOnly="true" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                <MudTextField T="string" Value="_product.Attributes[key]" ValueChanged="v => _product.Attributes[key] = v"
+                                              Label="Valor" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" OnClick="() => _product.Attributes.Remove(key)" aria-label="Quitar" />
+                            </MudStack>
+                        }
+                        <MudStack Row="true" AlignItems="AlignItems.Center">
+                            <MudTextField @bind-Value="_newAttrKey" Label="Nuevo atributo" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField @bind-Value="_newAttrValue" Label="Valor" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Add" OnClick="AddAttribute" aria-label="Agregar atributo" />
+                        </MudStack>
+                    </MudStack>
+                </MudForm>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="Save" Disabled="_saving">
+                    @(IsNew ? "Crear producto" : "Guardar cambios")
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudText Typo="Typo.h6">Variantes</MudText>
+                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                    Cada combinación de @DimensionsText es un SKU con su propio precio y stock.
+                </MudText>
+                <MudSimpleTable Dense="true" Class="my-3">
+                    <thead><tr><th>SKU</th><th>Variante</th><th>Precio</th><th>Stock</th><th></th></tr></thead>
+                    <tbody>
+                    @foreach (var v in IsNew ? _newVariants.Select(ToPreview) : _variants)
+                    {
+                        <tr>
+                            <td>@v.Sku</td>
+                            <td>@v.Description</td>
+                            <td>
+                                @if (IsNew)
+                                {
+                                    @Ui.Money(v.Price, Currency)
+                                }
+                                else
+                                {
+                                    <MudNumericField T="decimal" Value="v.Price" ValueChanged="p => ChangePrice(v, p)" Min="1m"
+                                                     Variant="Variant.Text" Margin="Margin.Dense" DebounceInterval="800" Style="max-width:130px" />
+                                }
+                            </td>
+                            <td>@v.Available</td>
+                            <td>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                               OnClick="() => RemoveVariant(v)" aria-label="Quitar variante" />
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </MudSimpleTable>
+
+                <MudText Typo="Typo.subtitle2" Class="mt-4">Agregar variante</MudText>
+                <MudGrid Spacing="1">
+                    <MudItem xs="12" sm="6"><MudTextField @bind-Value="_variant.Sku" Label="SKU" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    @if (Dimensions.Size)
+                    {
+                        <MudItem xs="6" sm="3"><MudTextField @bind-Value="_variant.Size" Label="Talla" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    }
+                    @if (Dimensions.Color)
+                    {
+                        <MudItem xs="6" sm="3"><MudTextField @bind-Value="_variant.Color" Label="Color" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    }
+                    @if (Dimensions.Volume)
+                    {
+                        <MudItem xs="6" sm="3"><MudNumericField @bind-Value="_variant.VolumeMl" Label="Volumen (ml)" Min="1" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    }
+                    <MudItem xs="6" sm="3"><MudNumericField @bind-Value="_variant.Price" Label="Precio" Min="0m" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="6" sm="3"><MudNumericField @bind-Value="_variant.InitialStock" Label="Stock inicial" Min="0" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                    <MudItem xs="12">
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Add"
+                                   OnClick="AddVariant">Agregar variante</MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [Parameter] public Guid? Id { get; set; }
+
+    private bool IsNew => Id is null;
+    private bool _loading = true;
+    private bool _saving;
+    private bool _valid;
+    private MudForm _form = default!;
+    private ProductUpsertDto _product = new();
+    private IReadOnlyList<VariantDto> _variants = [];
+    private readonly List<VariantUpsertDto> _newVariants = [];
+    private VariantUpsertDto _variant = new();
+    private string? _newAttrKey;
+    private string? _newAttrValue;
+
+    private (bool Size, bool Color, bool Volume) Dimensions => _product.Category.VariantDimensions();
+
+    private string DimensionsText => string.Join(", ", new[]
+    {
+        Dimensions.Size ? "talla" : null, Dimensions.Color ? "color" : null, Dimensions.Volume ? "volumen" : null
+    }.Where(x => x is not null));
+
+    private string AttributeHint => _product.Category switch
+    {
+        ProductCategory.Perfumes => "Sugeridos: NotasSalida, NotasCorazon, NotasFondo, Concentracion",
+        ProductCategory.Watches => "Sugeridos: Movimiento, Resistencia, Caja, Correa",
+        ProductCategory.Footwear => "Sugeridos: Material, Suela, Uso",
+        ProductCategory.Clothing => "Sugeridos: Material, Corte, Cuidado",
+        _ => "Sugeridos: Material, Ajuste"
+    };
+
+    protected override async Task OnAdminInitializedAsync()
+    {
+        if (!IsNew)
+            await LoadAsync();
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            (_product, _variants) = await Products.GetForEditAsync(Id!.Value);
+        }
+        catch (NotFoundException)
+        {
+            Navigation.NavigateTo("/not-found");
+        }
+    }
+
+    private static VariantDto ToPreview(VariantUpsertDto v) =>
+        new(Guid.Empty, v.Sku.ToUpperInvariant(), v.Size, v.Color, v.VolumeMl, v.Price, v.InitialStock,
+            string.Join(" / ", new[] { v.Size is null ? null : $"Talla {v.Size}", v.Color, v.VolumeMl is null ? null : $"{v.VolumeMl} ml" }
+                .Where(s => s is not null)));
+
+    private void AddAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(_newAttrKey) || string.IsNullOrWhiteSpace(_newAttrValue))
+            return;
+        _product.Attributes[_newAttrKey.Trim()] = _newAttrValue.Trim();
+        _newAttrKey = _newAttrValue = null;
+    }
+
+    private async Task AddVariant()
+    {
+        if (string.IsNullOrWhiteSpace(_variant.Sku) || _variant.Price <= 0)
+        {
+            Snackbar.Add("Indique SKU y precio mayor que cero.", Severity.Warning);
+            return;
+        }
+
+        if (IsNew)
+        {
+            if (_newVariants.Any(v => v.Sku.Equals(_variant.Sku, StringComparison.OrdinalIgnoreCase)))
+            {
+                Snackbar.Add("SKU repetido.", Severity.Warning);
+                return;
+            }
+
+            _newVariants.Add(_variant);
+            _variant = new VariantUpsertDto { Price = _variant.Price, Color = _variant.Color };
+            return;
+        }
+
+        if (await Snackbar.TryAsync(() => Products.AddVariantAsync(Id!.Value, _variant, Actor), "Variante agregada."))
+        {
+            _variant = new VariantUpsertDto { Price = _variant.Price, Color = _variant.Color };
+            await LoadAsync();
+        }
+    }
+
+    private async Task RemoveVariant(VariantDto v)
+    {
+        if (IsNew)
+        {
+            _newVariants.RemoveAll(x => x.Sku.Equals(v.Sku, StringComparison.OrdinalIgnoreCase));
+            return;
+        }
+
+        if (await Snackbar.TryAsync(() => Products.RemoveVariantAsync(Id!.Value, v.Id, Actor), "Variante eliminada."))
+            await LoadAsync();
+    }
+
+    private async Task ChangePrice(VariantDto v, decimal price)
+    {
+        if (await Snackbar.TryAsync(() => Products.ChangePriceAsync(v.Id, price, Actor), $"Precio de {v.Sku} actualizado."))
+            await LoadAsync();
+    }
+
+    private async Task Save()
+    {
+        await _form.ValidateAsync();
+        if (!_valid)
+            return;
+
+        _saving = true;
+        if (IsNew)
+        {
+            if (_newVariants.Count == 0)
+            {
+                Snackbar.Add("Agregue al menos una variante.", Severity.Warning);
+                _saving = false;
+                return;
+            }
+
+            Guid id = default;
+            if (await Snackbar.TryAsync(async () => id = await Products.CreateAsync(_product, _newVariants, Actor), "Producto creado."))
+                Navigation.NavigateTo($"/admin/productos/{id}");
+        }
+        else
+        {
+            await Snackbar.TryAsync(() => Products.UpdateAsync(Id!.Value, _product, Actor), "Producto actualizado.");
+        }
+
+        _saving = false;
+    }
+}

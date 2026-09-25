@@ -11,6 +11,8 @@
     <PackageReference Include="FluentAssertions" />
     <PackageReference Include="NSubstitute" />
     <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <ProjectReference Include="..\..\src\CgShop.Web\CgShop.Web.csproj" />
   </ItemGroup>
   <ItemGroup>
