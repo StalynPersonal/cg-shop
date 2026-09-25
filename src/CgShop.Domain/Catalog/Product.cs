@@ -82,6 +82,15 @@ public sealed class Product : Entity, ITenantEntity
         _variants.Remove(variant);
     }
 
+    /// <summary>Asigna un slug alternativo (p.ej. con sufijo) cuando el generado ya existe en la tienda.</summary>
+    public void UseSlug(string slug)
+    {
+        var normalized = Slugify(slug);
+        if (normalized.Length == 0)
+            throw new DomainException("El slug no puede estar vacío.");
+        Slug = normalized;
+    }
+
     public void Activate() => IsActive = true;
     public void Deactivate() => IsActive = false;
 
