@@ -480,3 +480,6 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Archivos subidos en desarrollo (comprobantes)
+**/App_Data/

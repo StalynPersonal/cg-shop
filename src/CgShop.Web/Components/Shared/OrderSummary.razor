@@ -1,0 +1,29 @@
+<MudPaper Class="pa-4" Outlined="true">
+    <MudText Typo="Typo.h6" Class="mb-2">Resumen</MudText>
+    <MudStack Spacing="1">
+        <MudStack Row="true" Justify="Justify.SpaceBetween">
+            <MudText>Subtotal</MudText><MudText>@Ui.Money(Subtotal, Currency)</MudText>
+        </MudStack>
+        <MudStack Row="true" Justify="Justify.SpaceBetween">
+            <MudText>ITBIS (@((TaxRate * 100).ToString("0.##"))%)</MudText><MudText>@Ui.Money(Tax, Currency)</MudText>
+        </MudStack>
+        <MudDivider Class="my-2" />
+        <MudStack Row="true" Justify="Justify.SpaceBetween">
+            <MudText Typo="Typo.h6">Total</MudText>
+            <MudText Typo="Typo.h6" Color="Color.Primary" data-testid="order-total">@Ui.Money(Subtotal + Tax, Currency)</MudText>
+        </MudStack>
+        @if (ChildContent is not null)
+        {
+            <div class="mt-3">@ChildContent</div>
+        }
+    </MudStack>
+</MudPaper>
+
+@code {
+    [Parameter] public decimal Subtotal { get; set; }
+    [Parameter] public decimal TaxRate { get; set; }
+    [Parameter] public string Currency { get; set; } = "DOP";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    private decimal Tax => Math.Round(Subtotal * TaxRate, 2, MidpointRounding.AwayFromZero);
+}

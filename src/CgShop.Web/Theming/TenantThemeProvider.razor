@@ -1,0 +1,20 @@
+@* Aplica el tema del tenant activo. Se renderiza una vez por circuito/usuario, con la instancia
+   de tema del tenant correspondiente: los colores de una tienda nunca se filtran a otra. *@
+@inject ITenantThemeService ThemeService
+
+<MudThemeProvider Theme="_theme" />
+
+@code {
+    /// <summary>Tenant activo; si es nulo se aplica el tema de la plataforma.</summary>
+    [Parameter] public TenantInfo? Tenant { get; set; }
+
+    private MudTheme _theme = default!;
+
+    public MudTheme Theme => _theme;
+
+    protected override void OnParametersSet()
+    {
+        var branding = Tenant is null ? TenantBranding.Platform : TenantBranding.From(Tenant);
+        _theme = ThemeService.BuildTheme(branding);
+    }
+}

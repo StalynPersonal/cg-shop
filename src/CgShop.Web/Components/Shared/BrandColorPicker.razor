@@ -1,0 +1,59 @@
+@using MudBlazor.Utilities
+@* Selector de color de marca: paleta rápida (verde, rojo, azul...) + selector libre MudColorPicker. *@
+<MudStack Spacing="2">
+    <MudText Typo="Typo.subtitle2">@Label @(Required ? "*" : "")</MudText>
+    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
+        @foreach (var (name, hex) in Presets)
+        {
+            <MudTooltip Text="@name">
+                <button type="button" aria-label="@name" data-testid="@($"preset-{hex}")" @onclick="() => SetAsync(hex)"
+                        style="width:32px;height:32px;border-radius:50%;cursor:pointer;background:@hex;
+                               border:@(string.Equals(Value, hex, StringComparison.OrdinalIgnoreCase) ? "3px solid #000" : "1px solid #ccc")">
+                </button>
+            </MudTooltip>
+        }
+        @if (!Required && Value is not null)
+        {
+            <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="() => SetAsync(null)">Quitar</MudButton>
+        }
+    </MudStack>
+    <MudColorPicker Label="Color personalizado (#RRGGBB)" Value="_mudColor" ValueChanged="OnPickerChanged"
+                    ShowAlpha="false" ColorPickerView="ColorPickerView.Spectrum" Variant="Variant.Outlined"
+                    Margin="Margin.Dense" Error="@(Required && !HexColor.IsValid(Value))"
+                    ErrorText="Seleccione el color primario" />
+</MudStack>
+
+@code {
+    public static readonly (string Name, string Hex)[] Presets =
+    [
+        ("Verde", "#2E7D32"), ("Rojo", "#C62828"), ("Azul", "#1565C0"), ("Morado", "#6A1B9A"),
+        ("Naranja", "#EF6C00"), ("Rosa", "#AD1457"), ("Turquesa", "#00838F"), ("Negro", "#212121"),
+        ("Marrón", "#4E342E"), ("Índigo", "#283593")
+    ];
+
+    [Parameter] public string Label { get; set; } = "Color";
+    [Parameter] public bool Required { get; set; }
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+
+    private MudColor? _mudColor;
+
+    protected override void OnParametersSet()
+    {
+        var current = _mudColor?.ToString(MudColorOutputFormats.Hex);
+        if (HexColor.IsValid(Value) && !string.Equals(current, Value, StringComparison.OrdinalIgnoreCase))
+            _mudColor = new MudColor(Value!);
+    }
+
+    private Task OnPickerChanged(MudColor color)
+    {
+        _mudColor = color;
+        return ValueChanged.InvokeAsync(color.ToString(MudColorOutputFormats.Hex).ToUpperInvariant());
+    }
+
+    private Task SetAsync(string? hex)
+    {
+        _mudColor = hex is null ? null : new MudColor(hex);
+        return ValueChanged.InvokeAsync(hex);
+    }
+}

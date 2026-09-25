@@ -1,0 +1,28 @@
+@* Vista previa aislada del branding: usa estilos inline (no altera el tema global del panel). *@
+<MudPaper Outlined="true" Class="overflow-hidden" data-testid="brand-preview">
+    <div style="background:@Primary;color:@PrimaryText;padding:12px 16px;display:flex;align-items:center;gap:8px">
+        <MudIcon Icon="@Icons.Material.Filled.Storefront" Style="@($"color:{PrimaryText}")" />
+        <b>@(string.IsNullOrWhiteSpace(Name) ? "Mi tienda" : Name)</b>
+        <span style="margin-left:auto;opacity:.85">@(string.IsNullOrWhiteSpace(Slug) ? "tienda" : Slug).tudominio.com</span>
+    </div>
+    <div style="padding:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <span style="background:@Primary;color:@PrimaryText;padding:8px 16px;border-radius:8px;font-weight:500">Agregar al carrito</span>
+        <span style="border:1px solid @Primary;color:@Primary;padding:7px 15px;border-radius:8px">Ver catálogo</span>
+        @if (Secondary is not null)
+        {
+            <span style="background:@Secondary;color:@SecondaryText;padding:4px 10px;border-radius:12px;font-size:.8rem">3</span>
+        }
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter] public string? Name { get; set; }
+    [Parameter] public string? Slug { get; set; }
+    [Parameter] public string PrimaryColor { get; set; } = "#37474F";
+    [Parameter] public string? SecondaryColor { get; set; }
+
+    private string Primary => HexColor.IsValid(PrimaryColor) ? PrimaryColor : "#9E9E9E";
+    private string PrimaryText => HexColor.ContrastText(Primary);
+    private string? Secondary => HexColor.IsValid(SecondaryColor) ? SecondaryColor : null;
+    private string SecondaryText => Secondary is null ? "#FFFFFF" : HexColor.ContrastText(Secondary);
+}

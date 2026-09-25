@@ -1,0 +1,47 @@
+@page "/cuenta/login"
+
+<PageTitle>Iniciar sesión</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-6">
+    <MudItem xs="12" sm="8" md="5">
+        <MudPaper Class="pa-8" Elevation="3">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.h5">
+                    @(Host.IsAdmin ? "Acceso Super Admin" : $"Acceso al panel de {Host.Tenant?.Name}")
+                </MudText>
+                @if (Error == "lockout")
+                {
+                    <MudAlert Severity="Severity.Error">Cuenta bloqueada temporalmente por intentos fallidos.</MudAlert>
+                }
+                else if (Error is not null)
+                {
+                    <MudAlert Severity="Severity.Error">Credenciales inválidas o el usuario no pertenece a este sitio.</MudAlert>
+                }
+
+                @* POST HTTP clásico: el inicio de sesión con cookie requiere una respuesta HTTP. *@
+                <form method="post" action="/cuenta/login" data-enhance="false">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+                    <MudStack Spacing="3">
+                        <label class="cg-field">
+                            <span>Correo electrónico</span>
+                            <input name="email" type="email" autocomplete="username" required />
+                        </label>
+                        <label class="cg-field">
+                            <span>Contraseña</span>
+                            <input name="password" type="password" autocomplete="current-password" required />
+                        </label>
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                                   Size="Size.Large" FullWidth="true">Entrar</MudButton>
+                    </MudStack>
+                </form>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+}

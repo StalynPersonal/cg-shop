@@ -1,0 +1,52 @@
+@if (Products.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Filled.Inventory2" Title="No hay productos"
+                Message="Prueba con otros filtros o vuelve más tarde." />
+}
+else
+{
+    <MudGrid Spacing="3">
+        @foreach (var product in Products)
+        {
+            <MudItem xs="12" sm="6" md="4" lg="3">
+                <MudCard Class="cg-product-card" Elevation="2" data-testid="product-card">
+                    <a href="@($"/producto/{product.Slug}")" style="text-decoration:none">
+                        @if (product.ImageUrl is not null)
+                        {
+                            <MudCardMedia Image="@product.ImageUrl" Height="180" />
+                        }
+                        else
+                        {
+                            <div class="cg-product-image">
+                                <MudIcon Icon="@Ui.CategoryIcon(product.Category)" Style="font-size:4rem" />
+                            </div>
+                        }
+                    </a>
+                    <MudCardContent Style="flex-grow:1">
+                        <MudText Typo="Typo.caption" Color="Color.Secondary">@product.Brand · @product.Category.DisplayName()</MudText>
+                        <MudLink Href="@($"/producto/{product.Slug}")" Color="Color.Default" Underline="Underline.Hover">
+                            <MudText Typo="Typo.subtitle1"><b>@product.Name</b></MudText>
+                        </MudLink>
+                        <MudText Typo="Typo.h6" Color="Color.Primary">Desde @Ui.Money(product.MinPrice, Currency)</MudText>
+                    </MudCardContent>
+                    <MudCardActions>
+                        @if (product.Available > 0)
+                        {
+                            <MudButton Href="@($"/producto/{product.Slug}")" Variant="Variant.Filled" Color="Color.Primary"
+                                       FullWidth="true" StartIcon="@Icons.Material.Filled.AddShoppingCart">Ver opciones</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton Disabled="true" Variant="Variant.Outlined" FullWidth="true">Agotado</MudButton>
+                        }
+                    </MudCardActions>
+                </MudCard>
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ProductCardDto> Products { get; set; } = [];
+    [Parameter] public string Currency { get; set; } = "DOP";
+}

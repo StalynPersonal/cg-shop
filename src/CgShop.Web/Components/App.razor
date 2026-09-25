@@ -1,11 +1,13 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="es">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <ResourcePreloader />
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="@Assets["_content/MudBlazor/MudBlazor.min.css"]" />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["CgShop.Web.styles.css"]" />
     <ImportMap />
@@ -13,9 +15,33 @@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    @* El tenant ya fue resuelto por TenantResolutionMiddleware en esta petición HTTP.
+       Se pasa al componente interactivo raíz: el circuito tiene su propio scope DI y debe
+       reconstruir su ITenantContext (los parámetros del componente raíz van protegidos). *@
+    <Routes @rendermode="InteractiveServer" HostKind="_hostKind" TenantSlug="@_tenantSlug" />
     <ReconnectModal />
+    <div id="blazor-error-ui" data-nosnippet>
+        Ocurrió un error inesperado.
+        <a href="." class="reload">Recargar</a>
+        <span class="dismiss">🗙</span>
+    </div>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
+    <script src="@Assets["_content/MudBlazor/MudBlazor.min.js"]"></script>
 </body>
 
 </html>
+
+@code {
+    [Inject] private ITenantContext TenantContext { get; set; } = default!;
+
+    private HostKind _hostKind;
+    private string? _tenantSlug;
+
+    protected override void OnInitialized()
+    {
+        _tenantSlug = TenantContext.Tenant?.Slug;
+        _hostKind = TenantContext.IsAdminHost ? HostKind.Admin
+            : TenantContext.Tenant is not null ? HostKind.Tenant
+            : HostKind.Root;
+    }
+}

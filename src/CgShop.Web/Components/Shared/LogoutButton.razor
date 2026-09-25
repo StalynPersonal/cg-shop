@@ -1,0 +1,10 @@
+@* El cierre de sesión es un POST HTTP (no del circuito) protegido con antiforgery. *@
+<form method="post" action="/cuenta/logout" data-enhance="false" style="display:inline">
+    <AntiforgeryToken />
+    <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Text" Color="@Color"
+               StartIcon="@Icons.Material.Filled.Logout">Salir</MudButton>
+</form>
+
+@code {
+    [Parameter] public Color Color { get; set; } = Color.Inherit;
+}

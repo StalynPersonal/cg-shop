@@ -1,7 +1,44 @@
-﻿@page "/"
+@page "/"
 
-<PageTitle>Home</PageTitle>
+@switch (Host.Kind)
+{
+    case HostKind.Tenant:
+        <CgShop.Web.Components.Pages.Store.StoreHome />
+        break;
+    case HostKind.Admin:
+        <AuthorizeView Policy="@Policies.SuperAdmin">
+            <Authorized>
+                <CgShop.Web.Components.Pages.SuperAdmin.TenantList />
+            </Authorized>
+            <NotAuthorized>
+                <RedirectToLogin />
+            </NotAuthorized>
+        </AuthorizeView>
+        break;
+    default:
+        <PageTitle>CG Shop</PageTitle>
+        <MudStack AlignItems="AlignItems.Center" Class="py-12" Spacing="4">
+            <MudIcon Icon="@Icons.Material.Filled.Hub" Color="Color.Primary" Style="font-size:5rem" />
+            <MudText Typo="Typo.h3" Align="Align.Center">CG Shop</MudText>
+            <MudText Typo="Typo.h6" Color="Color.Secondary" Align="Align.Center">
+                Plataforma e-commerce multi-tienda: ropa, gorras, relojes, perfumes y calzados.
+            </MudText>
+            <MudText Align="Align.Center">
+                Cada tienda opera en su propio subdominio, por ejemplo
+                <MudLink Href="@StoreUrl("verde")">verde</MudLink> o <MudLink Href="@StoreUrl("rojo")">rojo</MudLink>.
+            </MudText>
+            <MudButton Href="@StoreUrl("admin")" Variant="Variant.Outlined" Color="Color.Primary">Panel Super Admin</MudButton>
+        </MudStack>
+        break;
+}
 
-<h1>Hello, world!</h1>
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
 
-Welcome to your new app.
+    private string StoreUrl(string sub)
+    {
+        var uri = new Uri(Navigation.BaseUri);
+        return $"{uri.Scheme}://{sub}.{uri.Authority}/";
+    }
+}

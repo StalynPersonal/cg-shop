@@ -1,0 +1,9 @@
+<MudChip T="string" Color="@Ui.StatusColor(Status)" Icon="@Ui.StatusIcon(Status)" Size="@Size"
+         Variant="Variant.Filled" data-status="@Status">
+    @Status.DisplayName()
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired] public OrderStatus Status { get; set; }
+    [Parameter] public Size Size { get; set; } = Size.Small;
+}

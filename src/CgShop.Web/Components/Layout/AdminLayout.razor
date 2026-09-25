@@ -1,0 +1,40 @@
+@inherits LayoutComponentBase
+
+<MudLayout>
+    <MudAppBar Elevation="1" Color="Color.Primary">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                       OnClick="() => _drawerOpen = !_drawerOpen" aria-label="Menú" />
+        <MudText Typo="Typo.h6" Class="ml-2">@Host.Tenant?.Name · Administración</MudText>
+        <MudSpacer />
+        <AuthorizeView>
+            <MudText Typo="Typo.body2" Class="mr-2">@context.User.FindFirst(CgClaimTypes.FullName)?.Value</MudText>
+        </AuthorizeView>
+        <LogoutButton />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1" Variant="DrawerVariant.Responsive">
+        <MudNavMenu Color="Color.Primary">
+            <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Resumen</MudNavLink>
+            <MudNavLink Href="/admin/pagos" Icon="@Icons.Material.Filled.FactCheck">Pagos por validar</MudNavLink>
+            <MudNavLink Href="/admin/pedidos" Icon="@Icons.Material.Filled.Receipt">Pedidos</MudNavLink>
+            <MudNavLink Href="/admin/productos" Icon="@Icons.Material.Filled.Inventory2">Productos</MudNavLink>
+            <MudNavLink Href="/admin/inventario" Icon="@Icons.Material.Filled.Warehouse">Inventario</MudNavLink>
+            <AuthorizeView Policy="@Policies.TenantAdmin">
+                <MudNavLink Href="/admin/configuracion" Icon="@Icons.Material.Filled.AccountBalance">Datos de pago</MudNavLink>
+            </AuthorizeView>
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/" Icon="@Icons.Material.Filled.Storefront">Ver tienda</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-6">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    private bool _drawerOpen = true;
+}

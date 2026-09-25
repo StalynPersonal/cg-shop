@@ -1,0 +1,28 @@
+<MudItem xs="12" sm="6" md="@Md" Style="flex-grow:1">
+    <MudPaper Class="pa-4 d-flex align-center gap-3" Elevation="1" Style="@(Href is null ? "" : "cursor:pointer")"
+              @onclick="Navigate">
+        <MudAvatar Color="@Color" Variant="Variant.Filled">
+            <MudIcon Icon="@Icon" />
+        </MudAvatar>
+        <div>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">@Title</MudText>
+            <MudText Typo="Typo.h5" data-testid="stat-value">@Value</MudText>
+        </div>
+    </MudPaper>
+</MudItem>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Info;
+    [Parameter] public Color Color { get; set; } = Color.Primary;
+    [Parameter] public string? Href { get; set; }
+    [Parameter] public int Md { get; set; } = 2;
+
+    private void Navigate()
+    {
+        if (Href is not null)
+            Navigation.NavigateTo(Href);
+    }
+}

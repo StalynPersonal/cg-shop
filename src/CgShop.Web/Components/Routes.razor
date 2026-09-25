@@ -1,6 +1,91 @@
-﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
-    <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="routeData" Selector="h1" />
-    </Found>
-</Router>
+@using System.Reflection
+@inject TenantContext TenantContext
+@inject ITenantStore TenantStore
+
+@if (_host is not null)
+{
+    <CascadingValue Value="_host" IsFixed="true">
+        <TenantThemeProvider Tenant="_host.Tenant" />
+        <MudPopoverProvider />
+        <MudDialogProvider CloseOnEscapeKey="true" />
+        <MudSnackbarProvider />
+
+        <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
+            <Found Context="routeData">
+                @if (IsAllowedOnHost(routeData.PageType))
+                {
+                    <AuthorizeRouteView RouteData="routeData" DefaultLayout="DefaultLayout">
+                        <NotAuthorized>
+                            @if (context.User.Identity?.IsAuthenticated == true)
+                            {
+                                <AccessDeniedContent />
+                            }
+                            else
+                            {
+                                <RedirectToLogin />
+                            }
+                        </NotAuthorized>
+                        <Authorizing>
+                            <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+                        </Authorizing>
+                    </AuthorizeRouteView>
+                    <FocusOnNavigate RouteData="routeData" Selector="h1" />
+                }
+                else
+                {
+                    <LayoutView Layout="DefaultLayout">
+                        <NotFoundContent />
+                    </LayoutView>
+                }
+            </Found>
+        </Router>
+    </CascadingValue>
+}
+
+@code {
+    [Parameter] public HostKind HostKind { get; set; }
+    [Parameter] public string? TenantSlug { get; set; }
+
+    private HostContext? _host;
+
+    private Type DefaultLayout => _host!.Kind switch
+    {
+        HostKind.Tenant => typeof(Layout.StoreLayout),
+        _ => typeof(Layout.PlatformLayout)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        switch (HostKind)
+        {
+            case HostKind.Tenant when TenantSlug is not null:
+                var tenant = await TenantStore.FindBySlugAsync(TenantSlug);
+                if (tenant is { IsActive: true })
+                {
+                    TenantContext.SetTenant(tenant); // scope del circuito: filtros EF usan este tenant
+                    _host = new HostContext(HostKind.Tenant, tenant);
+                    return;
+                }
+
+                _host = new HostContext(HostKind.Root, null);
+                return;
+            case HostKind.Admin:
+                TenantContext.SetAdminHost();
+                _host = new HostContext(HostKind.Admin, null);
+                return;
+            default:
+                _host = new HostContext(HostKind.Root, null);
+                return;
+        }
+    }
+
+    /// <summary>Páginas de tienda solo en subdominios de tenant; páginas de Super Admin solo en admin.*.</summary>
+    private bool IsAllowedOnHost(Type pageType)
+    {
+        if (pageType.GetCustomAttribute<TenantHostAttribute>() is not null)
+            return _host!.IsTenant;
+        if (pageType.GetCustomAttribute<AdminHostAttribute>() is not null)
+            return _host!.IsAdmin;
+        return true;
+    }
+}
