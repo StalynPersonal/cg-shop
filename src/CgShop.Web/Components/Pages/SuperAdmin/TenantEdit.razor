@@ -1,0 +1,115 @@
+@page "/empresas/{Id:guid}"
+@attribute [AdminHost]
+@attribute [Authorize(Policy = Policies.SuperAdmin)]
+@inject SuperAdminTenantService Tenants
+@inject ISnackbar Snackbar
+@inject NavigationManager Navigation
+
+@if (_tenant is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <PageTitle>@_tenant.Name · Super Admin</PageTitle>
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Class="mb-4" Wrap="Wrap.Wrap">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h4">@_tenant.Name</MudText>
+            <MudLink Href="@StoreUrl()" Target="_blank">@StoreUrl()</MudLink>
+        </MudStack>
+        @if (_tenant.Status == TenantStatus.Active)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Error" StartIcon="@Icons.Material.Filled.Block"
+                       OnClick="() => SetStatus(TenantStatus.Suspended)">Suspender</MudButton>
+        }
+        else
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.PlayArrow"
+                       OnClick="() => SetStatus(TenantStatus.Active)">Reactivar</MudButton>
+        }
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_edit.Name" Label="Nombre comercial" Variant="Variant.Outlined" Required="true" />
+                    <BrandColorPicker Label="Color primario" Required="true" @bind-Value="_primary" />
+                    <BrandColorPicker Label="Color secundario (opcional)" @bind-Value="_edit.SecondaryColor" />
+                    <MudTextField @bind-Value="_edit.LogoUrl" Label="URL del logo" Variant="Variant.Outlined" />
+                    <MudNumericField @bind-Value="_taxPercent" Label="ITBIS (%)" Min="0m" Max="100m" Variant="Variant.Outlined" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="Save">Guardar cambios</MudButton>
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <BrandPreview Name="@_edit.Name" Slug="@_tenant.Slug" PrimaryColor="@(_primary ?? "")" SecondaryColor="@_edit.SecondaryColor" />
+            <MudPaper Class="pa-4 mt-4" Outlined="true">
+                <MudSimpleTable Dense="true">
+                    <tbody>
+                    <tr><td>Estado</td><td>@(_tenant.Status == TenantStatus.Active ? "Activa" : "Suspendida")</td></tr>
+                    <tr><td>Productos</td><td>@_tenant.ProductCount</td></tr>
+                    <tr><td>Pedidos</td><td>@_tenant.OrderCount</td></tr>
+                    <tr><td>Pagos por validar</td><td>@_tenant.PendingValidationCount</td></tr>
+                    <tr><td>Contacto</td><td>@_tenant.ContactEmail</td></tr>
+                    <tr><td>Alta</td><td>@Ui.Date(_tenant.CreatedAtUtc)</td></tr>
+                    </tbody>
+                </MudSimpleTable>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+    [Parameter] public Guid Id { get; set; }
+
+    private TenantSummaryDto? _tenant;
+    private UpdateBrandingRequest _edit = new();
+    private string? _primary;
+    private decimal _taxPercent;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _tenant = await Tenants.GetAsync(Id);
+        if (_tenant is null)
+        {
+            Navigation.NavigateTo("/not-found");
+            return;
+        }
+
+        _edit = new UpdateBrandingRequest
+        {
+            Name = _tenant.Name, PrimaryColor = _tenant.PrimaryColor, SecondaryColor = _tenant.SecondaryColor,
+            LogoUrl = _tenant.LogoUrl, TaxRate = _tenant.TaxRate
+        };
+        _primary = _tenant.PrimaryColor;
+        _taxPercent = _tenant.TaxRate * 100;
+    }
+
+    private async Task Save()
+    {
+        _edit.PrimaryColor = _primary ?? "";
+        _edit.TaxRate = _taxPercent / 100m;
+        var actor = (await AuthState).User.ToActor();
+        if (await Snackbar.TryAsync(() => Tenants.UpdateBrandingAsync(Id, _edit, actor), "Branding actualizado."))
+            await LoadAsync();
+    }
+
+    private async Task SetStatus(TenantStatus status)
+    {
+        var actor = (await AuthState).User.ToActor();
+        if (await Snackbar.TryAsync(() => Tenants.SetStatusAsync(Id, status, actor),
+                status == TenantStatus.Active ? "Empresa reactivada." : "Empresa suspendida."))
+            await LoadAsync();
+    }
+
+    private string StoreUrl()
+    {
+        var uri = new Uri(Navigation.BaseUri);
+        var host = uri.Host.StartsWith("admin.", StringComparison.OrdinalIgnoreCase) ? uri.Host[6..] : uri.Host;
+        return $"{uri.Scheme}://{_tenant!.Slug}.{host}{(uri.IsDefaultPort ? "" : $":{uri.Port}")}/";
+    }
+}

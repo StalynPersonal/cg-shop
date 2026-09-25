@@ -1,0 +1,86 @@
+@* Panel global del Super Admin (se muestra en "/" del host admin.*). *@
+@inject SuperAdminTenantService Tenants
+@inject NavigationManager Navigation
+
+<PageTitle>Empresas · Super Admin</PageTitle>
+
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+    <MudText Typo="Typo.h4">Empresas registradas</MudText>
+    <MudButton Href="/empresas/nueva" Variant="Variant.Filled" Color="Color.Primary"
+               StartIcon="@Icons.Material.Filled.AddBusiness">Nueva empresa</MudButton>
+</MudStack>
+
+@if (_stats is not null)
+{
+    <MudGrid Spacing="2" Class="mb-4">
+        <StatCard Title="Empresas" Value="@_stats.Tenants.ToString()" Icon="@Icons.Material.Filled.Business" />
+        <StatCard Title="Activas" Value="@_stats.ActiveTenants.ToString()" Icon="@Icons.Material.Filled.CheckCircle" />
+        <StatCard Title="Productos" Value="@_stats.Products.ToString()" Icon="@Icons.Material.Filled.Inventory2" />
+        <StatCard Title="Pedidos" Value="@_stats.Orders.ToString()" Icon="@Icons.Material.Filled.Receipt" />
+        <StatCard Title="Pagos por validar" Value="@_stats.PendingValidation.ToString()" Icon="@Icons.Material.Filled.HourglassTop" />
+    </MudGrid>
+}
+
+<MudDataGrid T="TenantSummaryDto" Items="_tenants" Loading="_tenants is null" Hover="true" Dense="true"
+             QuickFilter="QuickFilter" RowClick="@(e => Navigation.NavigateTo($"/empresas/{e.Item.Id}"))"
+             RowStyle="cursor:pointer" Elevation="1">
+    <ToolBarContent>
+        <MudTextField @bind-Value="_search" Placeholder="Buscar por nombre o subdominio" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mt-0" />
+    </ToolBarContent>
+    <Columns>
+        <TemplateColumn Title="Color" Sortable="false">
+            <CellTemplate>
+                <div title="@context.Item.PrimaryColor" data-testid="tenant-color"
+                     style="width:28px;height:28px;border-radius:50%;background:@context.Item.PrimaryColor;border:1px solid #ccc"></div>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.Name" Title="Empresa" />
+        <TemplateColumn Title="Subdominio" SortBy="x => x.Slug">
+            <CellTemplate>
+                <MudLink Href="@StoreUrl(context.Item.Slug)" Target="_blank" @onclick:stopPropagation="true">@context.Item.Slug</MudLink>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.ProductCount" Title="Productos" />
+        <PropertyColumn Property="x => x.OrderCount" Title="Pedidos" />
+        <PropertyColumn Property="x => x.PendingValidationCount" Title="Por validar" />
+        <TemplateColumn Title="Estado" SortBy="x => x.Status">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small" Color="@(context.Item.Status == TenantStatus.Active ? Color.Success : Color.Error)">
+                    @(context.Item.Status == TenantStatus.Active ? "Activa" : "Suspendida")
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <PropertyColumn Property="x => x.CreatedAtUtc" Title="Alta" Format="dd/MM/yyyy" />
+    </Columns>
+    <NoRecordsContent>
+        <MudText>No hay empresas registradas.</MudText>
+    </NoRecordsContent>
+    <PagerContent>
+        <MudDataGridPager T="TenantSummaryDto" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    private IReadOnlyList<TenantSummaryDto>? _tenants;
+    private PlatformStatsDto? _stats;
+    private string? _search;
+
+    private Func<TenantSummaryDto, bool> QuickFilter => t =>
+        string.IsNullOrWhiteSpace(_search) ||
+        t.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+        t.Slug.Contains(_search, StringComparison.OrdinalIgnoreCase);
+
+    protected override async Task OnInitializedAsync()
+    {
+        _stats = await Tenants.GetStatsAsync();
+        _tenants = await Tenants.ListAsync();
+    }
+
+    private string StoreUrl(string slug)
+    {
+        var uri = new Uri(Navigation.BaseUri);
+        var host = uri.Host.StartsWith("admin.", StringComparison.OrdinalIgnoreCase) ? uri.Host[6..] : uri.Host;
+        return $"{uri.Scheme}://{slug}.{host}{(uri.IsDefaultPort ? "" : $":{uri.Port}")}/";
+    }
+}

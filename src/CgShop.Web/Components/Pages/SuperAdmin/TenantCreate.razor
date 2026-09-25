@@ -1,0 +1,106 @@
+@page "/empresas/nueva"
+@attribute [AdminHost]
+@attribute [Authorize(Policy = Policies.SuperAdmin)]
+@inject SuperAdminTenantService Tenants
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Nueva empresa · Super Admin</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Registrar nueva empresa</MudText>
+
+<MudForm @ref="_form" @bind-IsValid="_valid">
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-3">Datos de la empresa</MudText>
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_request.Name" @bind-Value:after="SuggestSlug" Label="Nombre comercial"
+                                  Required="true" RequiredError="Requerido" Variant="Variant.Outlined" MaxLength="150" />
+                    <MudTextField @bind-Value="_request.Slug" @bind-Value:after="() => _slugTouched = true" Label="Subdominio"
+                                  Required="true" RequiredError="Requerido" Variant="Variant.Outlined"
+                                  Validation="@(new Func<string, string?>(ValidateSlug))"
+                                  Adornment="Adornment.End" AdornmentText=".tudominio.com" MaxLength="40"
+                                  HelperText="3-40 caracteres: letras minúsculas, números y guiones" />
+                    <MudTextField @bind-Value="_request.ContactEmail" Label="Correo de contacto" InputType="InputType.Email"
+                                  Variant="Variant.Outlined" />
+                    <MudNumericField @bind-Value="_taxPercent" Label="ITBIS (%)" Min="0m" Max="100m" Variant="Variant.Outlined" />
+                </MudStack>
+
+                <MudText Typo="Typo.h6" Class="mt-6 mb-3">Identidad visual</MudText>
+                <MudStack Spacing="4">
+                    <BrandColorPicker Label="Color primario de la tienda" Required="true" @bind-Value="_request.PrimaryColor" />
+                    <BrandColorPicker Label="Color secundario (opcional)" @bind-Value="_request.SecondaryColor" />
+                    <MudTextField @bind-Value="_request.LogoUrl" Label="URL del logo (opcional)" Variant="Variant.Outlined" />
+                </MudStack>
+
+                <MudText Typo="Typo.h6" Class="mt-6 mb-3">Administrador de la tienda</MudText>
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_request.AdminFullName" Label="Nombre completo" Required="true"
+                                  RequiredError="Requerido" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="_request.AdminEmail" Label="Correo (usuario)" Required="true"
+                                  RequiredError="Requerido" InputType="InputType.Email" Variant="Variant.Outlined" />
+                    <MudTextField @bind-Value="_request.AdminPassword" Label="Contraseña inicial" Required="true"
+                                  RequiredError="Requerido" InputType="InputType.Password" Variant="Variant.Outlined"
+                                  Validation="@(new Func<string, string?>(p => p?.Length >= 8 ? null : "Mínimo 8 caracteres"))" />
+                </MudStack>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-6" Outlined="true" Style="position:sticky;top:80px">
+                <MudText Typo="Typo.h6" Class="mb-3">Vista previa</MudText>
+                <BrandPreview Name="@_request.Name" Slug="@_request.Slug" PrimaryColor="@(_request.PrimaryColor ?? "")"
+                              SecondaryColor="@_request.SecondaryColor" />
+                @if (!HexColor.IsValid(_request.PrimaryColor))
+                {
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-3">
+                        El color primario es obligatorio para crear la empresa.
+                    </MudAlert>
+                }
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true" Class="mt-4"
+                           OnClick="Save" Disabled="_saving" data-testid="create-tenant">
+                    Crear empresa
+                </MudButton>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+</MudForm>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private bool _slugTouched;
+    private decimal _taxPercent = Tenant.DefaultTaxRate * 100;
+    private readonly CreateTenantRequest _request = new() { PrimaryColor = "" };
+
+    private void SuggestSlug()
+    {
+        if (!_slugTouched)
+            _request.Slug = Product.Slugify(_request.Name ?? "");
+    }
+
+    private static string? ValidateSlug(string? slug) =>
+        Tenant.IsValidSlug(slug?.Trim().ToLowerInvariant()) ? null : "Subdominio inválido o reservado";
+
+    private async Task Save()
+    {
+        await _form.ValidateAsync();
+        if (!_valid || !HexColor.IsValid(_request.PrimaryColor))
+        {
+            Snackbar.Add("Complete los campos obligatorios, incluido el color primario.", Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        _request.TaxRate = _taxPercent / 100m;
+        var actor = (await AuthState).User.ToActor();
+        Guid id = default;
+        var ok = await Snackbar.TryAsync(async () => id = await Tenants.CreateAsync(_request, actor),
+            $"Empresa '{_request.Name}' creada con su color {_request.PrimaryColor}.");
+        _saving = false;
+        if (ok)
+            Navigation.NavigateTo($"/empresas/{id}");
+    }
+}
