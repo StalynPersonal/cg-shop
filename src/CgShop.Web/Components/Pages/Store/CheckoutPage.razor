@@ -1,0 +1,133 @@
+@page "/checkout"
+@attribute [TenantHost]
+@inject CartState Cart
+@inject CatalogService Catalog
+@inject CheckoutService Checkout
+@inject CustomerOrderService CustomerOrders
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Finalizar compra · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Finalizar compra</MudText>
+
+@if (!Cart.Loaded || _methods is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (Cart.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Filled.RemoveShoppingCart" Title="Tu carrito está vacío">
+        <MudButton Href="/catalogo" Variant="Variant.Filled" Color="Color.Primary">Explorar catálogo</MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudForm @ref="_form" @bind-IsValid="_valid">
+                    <MudText Typo="Typo.h6" Class="mb-2">Datos de contacto y envío</MudText>
+                    <MudGrid Spacing="2">
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_request.FullName" Label="Nombre completo" Required="true"
+                                          RequiredError="Requerido" Variant="Variant.Outlined" MaxLength="150" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_request.Email" Label="Correo" Required="true" InputType="InputType.Email"
+                                          Validation="@(new Func<string, string?>(ValidateEmail))" Variant="Variant.Outlined" MaxLength="200" />
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudTextField @bind-Value="_request.Phone" Label="Teléfono" Required="true" RequiredError="Requerido"
+                                          InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="30" />
+                        </MudItem>
+                        <MudItem xs="12">
+                            <MudTextField @bind-Value="_request.ShippingAddress" Label="Dirección de envío" Required="true"
+                                          RequiredError="Requerido" Lines="2" Variant="Variant.Outlined" MaxLength="500" />
+                        </MudItem>
+                    </MudGrid>
+
+                    <MudText Typo="Typo.h6" Class="mt-6 mb-2">Método de pago</MudText>
+                    @if (_methods.Count == 0)
+                    {
+                        <MudAlert Severity="Severity.Warning">La tienda aún no configuró sus métodos de pago.</MudAlert>
+                    }
+                    else
+                    {
+                        <MudRadioGroup T="PaymentMethod" @bind-Value="_request.PaymentMethod">
+                            @foreach (var method in _methods)
+                            {
+                                <MudRadio Value="method" Color="Color.Primary">@method.DisplayName()</MudRadio>
+                            }
+                        </MudRadioGroup>
+                        <MudAlert Severity="Severity.Info" Dense="true" Class="mt-2">
+                            No cobramos en línea. Al confirmar, te mostraremos los datos para pagar y podrás subir tu comprobante.
+                            Tu pedido se procesa cuando la tienda valide el pago; apartamos el stock mientras tanto.
+                        </MudAlert>
+                    }
+                </MudForm>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <OrderSummary Subtotal="_subtotal" TaxRate="@(Host.Tenant?.TaxRate ?? 0.18m)" Currency="@Host.Currency">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true"
+                           Disabled="@(_submitting || _methods.Count == 0)" OnClick="PlaceOrder" data-testid="place-order">
+                    @if (_submitting)
+                    {
+                        <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                    }
+                    Confirmar pedido
+                </MudButton>
+            </OrderSummary>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _submitting;
+    private decimal _subtotal;
+    private IReadOnlyList<PaymentMethod>? _methods;
+    private readonly PlaceOrderRequest _request = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _methods = await CustomerOrders.GetAvailablePaymentMethodsAsync();
+        if (_methods.Count > 0)
+            _request.PaymentMethod = _methods[0];
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        await Cart.EnsureLoadedAsync();
+        var info = await Catalog.GetCartVariantsAsync(Cart.Lines.Select(l => l.VariantId));
+        _subtotal = Cart.Lines.Join(info, l => l.VariantId, i => i.Variant.Id, (l, i) => l.Quantity * i.Variant.Price).Sum();
+        StateHasChanged();
+    }
+
+    private static string? ValidateEmail(string? email) =>
+        string.IsNullOrWhiteSpace(email) || !email.Contains('@') ? "Correo inválido" : null;
+
+    private async Task PlaceOrder()
+    {
+        await _form.ValidateAsync();
+        if (!_valid)
+            return;
+
+        _submitting = true;
+        PlaceOrderResult? result = null;
+        _request.Lines = Cart.Lines.ToList();
+        await Snackbar.TryAsync(async () => result = await Checkout.PlaceOrderAsync(_request));
+        _submitting = false;
+
+        if (result is not null)
+        {
+            await Cart.ClearAsync();
+            Navigation.NavigateTo($"/pedido/{result.Number}?t={result.AccessToken}");
+        }
+    }
+}

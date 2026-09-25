@@ -1,0 +1,129 @@
+@page "/catalogo"
+@page "/catalogo/{CategorySlug}"
+@attribute [TenantHost]
+@inject CatalogService Catalog
+@inject NavigationManager Navigation
+
+<PageTitle>@(_category?.DisplayName() ?? "Catálogo") · @Host.Tenant?.Name</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">@(_category?.DisplayName() ?? "Todo el catálogo")</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="3">
+        <MudPaper Class="pa-4" Outlined="true">
+            <MudStack Spacing="3">
+                <MudTextField @bind-Value="_search" Label="Buscar" Adornment="Adornment.Start"
+                              AdornmentIcon="@Icons.Material.Filled.Search" Immediate="false"
+                              OnBlur="ReloadAsync" OnKeyUp="OnSearchKeyUp" Clearable="true"
+                              OnClearButtonClick="ReloadAsync" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudSelect T="string" Label="Categoría" Value="@(CategorySlug ?? "")" ValueChanged="ChangeCategory"
+                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="@("")">Todas</MudSelectItem>
+                    @foreach (var c in Enum.GetValues<ProductCategory>())
+                    {
+                        <MudSelectItem Value="@Ui.CategorySlug(c)">@c.DisplayName()</MudSelectItem>
+                    }
+                </MudSelect>
+                @if (_facets is not null)
+                {
+                    @if (_facets.Sizes.Count > 0)
+                    {
+                        <MudSelect T="string" Label="Talla" @bind-Value="_size" @bind-Value:after="ReloadAsync"
+                                   Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var s in _facets.Sizes)
+                            {
+                                <MudSelectItem Value="@s">@s</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                    @if (_facets.Colors.Count > 0)
+                    {
+                        <MudSelect T="string" Label="Color" @bind-Value="_color" @bind-Value:after="ReloadAsync"
+                                   Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
+                            @foreach (var c in _facets.Colors)
+                            {
+                                <MudSelectItem Value="@c">@c</MudSelectItem>
+                            }
+                        </MudSelect>
+                    }
+                }
+                <MudSelect T="CatalogSort" Label="Ordenar por" @bind-Value="_sort" @bind-Value:after="ReloadAsync"
+                           Variant="Variant.Outlined" Margin="Margin.Dense">
+                    <MudSelectItem Value="CatalogSort.Newest">Más recientes</MudSelectItem>
+                    <MudSelectItem Value="CatalogSort.PriceAsc">Menor precio</MudSelectItem>
+                    <MudSelectItem Value="CatalogSort.PriceDesc">Mayor precio</MudSelectItem>
+                    <MudSelectItem Value="CatalogSort.Name">Nombre</MudSelectItem>
+                </MudSelect>
+                <MudSwitch T="bool" @bind-Value="_inStock" @bind-Value:after="ReloadAsync" Color="Color.Primary"
+                           Label="Solo con stock" />
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" md="9">
+        @if (_result is null)
+        {
+            <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-2">@_result.TotalCount productos</MudText>
+            <ProductGrid Products="_result.Items" Currency="@Host.Currency" />
+            @if (_result.TotalPages > 1)
+            {
+                <MudStack Row="true" Justify="Justify.Center" Class="mt-6">
+                    <MudPagination Count="_result.TotalPages" Selected="_page" SelectedChanged="ChangePage"
+                                   Color="Color.Primary" />
+                </MudStack>
+            }
+        }
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    [Parameter] public string? CategorySlug { get; set; }
+
+    private ProductCategory? _category;
+    private CatalogFacetsDto? _facets;
+    private PagedResult<ProductCardDto>? _result;
+    private string? _search;
+    private string? _size;
+    private string? _color;
+    private bool _inStock;
+    private CatalogSort _sort = CatalogSort.Newest;
+    private int _page = 1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _category = Ui.CategoryFromSlug(CategorySlug);
+        _size = _color = null;
+        _page = 1;
+        _facets = await Catalog.GetFacetsAsync(_category);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync() =>
+        _result = await Catalog.SearchAsync(new CatalogQuery(_category, _search, _size, _color, InStockOnly: _inStock,
+            Sort: _sort, Page: _page, PageSize: 12));
+
+    private async Task ReloadAsync()
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await ReloadAsync();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private void ChangeCategory(string slug) =>
+        Navigation.NavigateTo(string.IsNullOrEmpty(slug) ? "/catalogo" : $"/catalogo/{slug}");
+}

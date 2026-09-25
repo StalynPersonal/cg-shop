@@ -1,0 +1,178 @@
+@page "/pedido/{Number}"
+@attribute [TenantHost]
+@inject CustomerOrderService CustomerOrders
+@inject ISnackbar Snackbar
+@inject IOptions<OrderOptions> Options
+@using Microsoft.Extensions.Options
+
+<PageTitle>Pedido @Number · @Host.Tenant?.Name</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_order is null)
+{
+    <EmptyState Icon="@Icons.Material.Filled.SearchOff" Title="Pedido no encontrado"
+                Message="Verifica el enlace que recibiste al confirmar tu compra." />
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-4">
+        <MudText Typo="Typo.h4">Pedido #@_order.Number</MudText>
+        <OrderStatusChip Status="_order.Status" Size="Size.Large" />
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="7">
+            @if (_order.Status == OrderStatus.PendingPaymentValidation && _instructions is not null)
+            {
+                <MudPaper Class="pa-6 mb-4" Outlined="true" data-testid="payment-instructions">
+                    <MudText Typo="Typo.h6">Instrucciones de pago</MudText>
+                    <MudText Class="mb-3">
+                        Paga <b>@Ui.Money(_order.Total, _order.Currency)</b> antes del
+                        <b>@Ui.Date(_order.ReservationExpiresAtUtc)</b>. Mientras tanto apartamos tus productos.
+                        Indica el número de pedido <b>@_order.Number</b> como referencia.
+                    </MudText>
+
+                    @if (_order.PaymentMethod == PaymentMethod.BankTransfer)
+                    {
+                        @foreach (var account in _instructions.BankAccounts)
+                        {
+                            <MudCard Outlined="true" Class="mb-2">
+                                <MudCardContent>
+                                    <MudText Typo="Typo.subtitle1"><b>@account.BankName</b></MudText>
+                                    <MudText>Cuenta @account.AccountType: <b>@account.AccountNumber</b></MudText>
+                                    <MudText>Titular: @account.AccountHolder @(account.HolderDocument is null ? "" : $"· {account.HolderDocument}")</MudText>
+                                </MudCardContent>
+                            </MudCard>
+                        }
+                    }
+                    else if (_instructions.PaymentLinkUrl is not null)
+                    {
+                        <MudButton Href="@_instructions.PaymentLinkUrl" Target="_blank" Rel="noopener noreferrer"
+                                   Variant="Variant.Filled" Color="Color.Primary" EndIcon="@Icons.Material.Filled.OpenInNew">
+                            Ir al enlace de pago
+                        </MudButton>
+                    }
+                    @if (_instructions.Instructions is not null)
+                    {
+                        <MudAlert Severity="Severity.Info" Class="mt-3" Dense="true">@_instructions.Instructions</MudAlert>
+                    }
+                </MudPaper>
+
+                <MudPaper Class="pa-6 mb-4" Outlined="true">
+                    <MudText Typo="Typo.h6">Sube tu comprobante (opcional)</MudText>
+                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                        JPG, PNG o PDF de hasta @(Options.Value.MaxReceiptBytes / 1024 / 1024) MB. Agiliza la validación de tu pago.
+                    </MudText>
+                    <MudTextField @bind-Value="_reference" Label="Referencia de la transacción (opcional)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" MaxLength="100" Class="mb-2" />
+                    <MudFileUpload T="IBrowserFile" Accept="@ReceiptFileValidator.AcceptAttribute" FilesChanged="Upload"
+                                   MaxFileSize="@Options.Value.MaxReceiptBytes" Disabled="_uploading">
+                        <CustomContent>
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.CloudUpload"
+                                       Disabled="_uploading" OnClick="@context.OpenFilePickerAsync" data-testid="upload-receipt">
+                                @(_uploading ? "Subiendo..." : "Seleccionar comprobante")
+                            </MudButton>
+                        </CustomContent>
+                    </MudFileUpload>
+                </MudPaper>
+            }
+            else if (_order.Status == OrderStatus.PaymentRejected)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-4">
+                    La tienda no pudo validar tu pago: @_order.History.LastOrDefault(h => h.To == OrderStatus.PaymentRejected)?.Note
+                </MudAlert>
+            }
+
+            <MudPaper Class="pa-6" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Seguimiento</MudText>
+                <MudTimeline TimelinePosition="TimelinePosition.Start" Class="pa-0">
+                    @foreach (var h in _order.History.Reverse())
+                    {
+                        <MudTimelineItem Color="@Ui.StatusColor(h.To)" Size="Size.Small">
+                            <MudText Typo="Typo.subtitle2">@h.To.DisplayName()</MudText>
+                            <MudText Typo="Typo.caption">@Ui.Date(h.AtUtc) @(h.Note is null ? "" : $"· {h.Note}")</MudText>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+                @if (_order.Receipts.Count > 0)
+                {
+                    <MudText Typo="Typo.subtitle2" Class="mt-2">Comprobantes enviados</MudText>
+                    @foreach (var r in _order.Receipts)
+                    {
+                        <MudChip T="string" Icon="@Icons.Material.Filled.AttachFile" Size="Size.Small">
+                            @r.FileName (@Ui.FileSize(r.SizeBytes))
+                        </MudChip>
+                    }
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="5">
+            <MudPaper Class="pa-4" Outlined="true">
+                <MudText Typo="Typo.h6" Class="mb-2">Productos</MudText>
+                @foreach (var item in _order.Items)
+                {
+                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-1">
+                        <MudText Typo="Typo.body2">@item.Quantity × @item.ProductName <br /><small>@item.VariantDescription</small></MudText>
+                        <MudText Typo="Typo.body2">@Ui.Money(item.LineTotal, _order.Currency)</MudText>
+                    </MudStack>
+                }
+                <MudDivider Class="my-2" />
+                <MudStack Row="true" Justify="Justify.SpaceBetween"><MudText>Subtotal</MudText><MudText>@Ui.Money(_order.Subtotal, _order.Currency)</MudText></MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween"><MudText>ITBIS</MudText><MudText>@Ui.Money(_order.Tax, _order.Currency)</MudText></MudStack>
+                <MudStack Row="true" Justify="Justify.SpaceBetween">
+                    <MudText Typo="Typo.h6">Total</MudText>
+                    <MudText Typo="Typo.h6" Color="Color.Primary">@Ui.Money(_order.Total, _order.Currency)</MudText>
+                </MudStack>
+                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                    Guarda este enlace para consultar tu pedido.
+                </MudText>
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    [Parameter] public string Number { get; set; } = "";
+    [SupplyParameterFromQuery(Name = "t")] public string? Token { get; set; }
+
+    private bool _loading = true;
+    private bool _uploading;
+    private string? _reference;
+    private OrderDetailDto? _order;
+    private PaymentInstructionsDto? _instructions;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _order = string.IsNullOrEmpty(Token) ? null : await CustomerOrders.GetAsync(Number, Token);
+        if (_order is not null)
+            _instructions = await CustomerOrders.GetPaymentInstructionsAsync(_order.PaymentMethod);
+        _loading = false;
+    }
+
+    private async Task Upload(IBrowserFile? file)
+    {
+        if (file is null || _order is null)
+            return;
+        _uploading = true;
+        var max = Options.Value.MaxReceiptBytes;
+        var ok = await Snackbar.TryAsync(async () =>
+        {
+            await using var stream = file.OpenReadStream(max);
+            await CustomerOrders.UploadReceiptAsync(Number, Token!, file.Name, stream, file.Size, _reference);
+        }, "Comprobante recibido. La tienda validará tu pago en breve.");
+        _uploading = false;
+        if (ok)
+        {
+            _reference = null;
+            await LoadAsync();
+        }
+    }
+}

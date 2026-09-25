@@ -1,0 +1,209 @@
+@page "/producto/{Slug}"
+@attribute [TenantHost]
+@inject CatalogService Catalog
+@inject CartState Cart
+@inject ISnackbar Snackbar
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_product is null)
+{
+    <NotFoundContent />
+}
+else
+{
+    <PageTitle>@_product.Name · @Host.Tenant?.Name</PageTitle>
+    <MudBreadcrumbs Items="_breadcrumbs" Class="px-0" />
+    <MudGrid Spacing="6">
+        <MudItem xs="12" md="6">
+            @if (_product.ImageUrl is not null)
+            {
+                <MudImage Src="@_product.ImageUrl" Alt="@_product.Name" Fluid="true" Class="rounded-lg" />
+            }
+            else
+            {
+                <div class="cg-product-image rounded-lg" style="height:380px">
+                    <MudIcon Icon="@Ui.CategoryIcon(_product.Category)" Style="font-size:8rem" />
+                </div>
+            }
+        </MudItem>
+        <MudItem xs="12" md="6">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.overline">@_product.Brand · @_product.Category.DisplayName()</MudText>
+                <MudText Typo="Typo.h4" data-testid="product-name">@_product.Name</MudText>
+                <MudText Typo="Typo.h5" Color="Color.Primary" data-testid="product-price">
+                    @Ui.Money(_selected?.Price ?? _product.Variants.Min(v => v.Price), Host.Currency)
+                </MudText>
+                @if (_product.Description is not null)
+                {
+                    <MudText>@_product.Description</MudText>
+                }
+
+                @if (_sizes.Count > 0)
+                {
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Talla</MudText>
+                        <MudChipSet T="string" SelectedValue="_size" SelectedValueChanged="SelectSize" SelectionMode="SelectionMode.SingleSelection"
+                                    CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
+                            @foreach (var s in _sizes)
+                            {
+                                <MudChip T="string" Value="@s" Text="@s" Disabled="@(!IsAvailable(size: s))" />
+                            }
+                        </MudChipSet>
+                    </div>
+                }
+                @if (_colors.Count > 0)
+                {
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Color</MudText>
+                        <MudChipSet T="string" SelectedValue="_color" SelectedValueChanged="SelectColor" SelectionMode="SelectionMode.SingleSelection"
+                                    CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
+                            @foreach (var c in _colors)
+                            {
+                                <MudChip T="string" Value="@c" Text="@c" Disabled="@(!IsAvailable(color: c))" />
+                            }
+                        </MudChipSet>
+                    </div>
+                }
+                @if (_volumes.Count > 0)
+                {
+                    <div>
+                        <MudText Typo="Typo.subtitle2">Presentación</MudText>
+                        <MudChipSet T="string" SelectedValue="@_volume?.ToString()" SelectedValueChanged="SelectVolume"
+                                    SelectionMode="SelectionMode.SingleSelection" CheckMark="false" Color="Color.Primary"
+                                    Variant="Variant.Outlined">
+                            @foreach (var v in _volumes)
+                            {
+                                <MudChip T="string" Value="@v.ToString()" Text="@($"{v} ml")" />
+                            }
+                        </MudChipSet>
+                    </div>
+                }
+
+                @if (_selected is not null)
+                {
+                    <MudText Typo="Typo.body2" Color="@(_selected.Available > 0 ? Color.Success : Color.Error)">
+                        @(_selected.Available > 0 ? $"{_selected.Available} disponibles · SKU {_selected.Sku}" : "Agotado")
+                    </MudText>
+                }
+
+                <MudStack Row="true" AlignItems="AlignItems.Center">
+                    <MudNumericField @bind-Value="_quantity" Min="1" Max="@MaxQuantity" Label="Cantidad"
+                                     Variant="Variant.Outlined" Style="max-width:120px" Margin="Margin.Dense" />
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+                               StartIcon="@Icons.Material.Filled.AddShoppingCart" Disabled="@(!CanAdd)"
+                               OnClick="AddToCart" data-testid="add-to-cart">
+                        Agregar al carrito
+                    </MudButton>
+                </MudStack>
+
+                @if (_product.Attributes.Count > 0)
+                {
+                    <MudSimpleTable Dense="true" Outlined="true" Class="mt-2">
+                        <tbody>
+                        @foreach (var (key, value) in _product.Attributes)
+                        {
+                            <tr><td><b>@Humanize(key)</b></td><td>@value</td></tr>
+                        }
+                        </tbody>
+                    </MudSimpleTable>
+                }
+            </MudStack>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    [Parameter] public string Slug { get; set; } = "";
+
+    private bool _loading = true;
+    private ProductDetailDto? _product;
+    private List<BreadcrumbItem> _breadcrumbs = [];
+    private List<string> _sizes = [];
+    private List<string> _colors = [];
+    private List<int> _volumes = [];
+    private string? _size;
+    private string? _color;
+    private int? _volume;
+    private int _quantity = 1;
+    private VariantDto? _selected;
+
+    private int MaxQuantity => Math.Max(1, Math.Min(_selected?.Available ?? 1, CheckoutService.MaxQuantityPerLine));
+    private bool CanAdd => _selected is { Available: > 0 } && _quantity >= 1 && _quantity <= _selected.Available;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        _product = await Catalog.GetBySlugAsync(Slug);
+        _loading = false;
+        if (_product is null)
+            return;
+
+        _breadcrumbs =
+        [
+            new("Inicio", "/"),
+            new(_product.Category.DisplayName(), $"/catalogo/{Ui.CategorySlug(_product.Category)}"),
+            new(_product.Name, null, disabled: true)
+        ];
+        _sizes = CatalogServiceSizes(_product.Variants.Where(v => v.Size != null).Select(v => v.Size!));
+        _colors = _product.Variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList();
+        _volumes = _product.Variants.Where(v => v.VolumeMl != null).Select(v => v.VolumeMl!.Value).Distinct().Order().ToList();
+
+        // Preselección: primera variante con stock.
+        var first = _product.Variants.FirstOrDefault(v => v.Available > 0) ?? _product.Variants[0];
+        _size = first.Size;
+        _color = first.Color;
+        _volume = first.VolumeMl;
+        Resolve();
+    }
+
+    private static List<string> CatalogServiceSizes(IEnumerable<string> sizes) =>
+        sizes.Distinct().OrderBy(s => decimal.TryParse(s, out var n) ? n : decimal.MaxValue).ThenBy(s => s).ToList();
+
+    private bool IsAvailable(string? size = null, string? color = null) =>
+        _product!.Variants.Any(v => v.Available > 0 &&
+                                    (size is null || v.Size == size) &&
+                                    (color is null || v.Color == color) &&
+                                    (size is not null || _size is null || v.Size == _size));
+
+    private void SelectSize(string? size)
+    {
+        _size = size;
+        Resolve();
+    }
+
+    private void SelectColor(string? color)
+    {
+        _color = color;
+        Resolve();
+    }
+
+    private void SelectVolume(string? volume)
+    {
+        _volume = int.TryParse(volume, out var v) ? v : null;
+        Resolve();
+    }
+
+    private void Resolve()
+    {
+        _selected = _product!.Variants.FirstOrDefault(v =>
+            (_sizes.Count == 0 || v.Size == _size) &&
+            (_colors.Count == 0 || v.Color == _color) &&
+            (_volumes.Count == 0 || v.VolumeMl == _volume));
+        _quantity = Math.Clamp(_quantity, 1, MaxQuantity);
+    }
+
+    private async Task AddToCart()
+    {
+        if (_selected is null)
+            return;
+        await Cart.AddAsync(_selected.Id, _quantity);
+        Snackbar.Add($"{_product!.Name} ({_selected.Description}) agregado al carrito", Severity.Success);
+    }
+
+    private static string Humanize(string key) =>
+        System.Text.RegularExpressions.Regex.Replace(key, "(?<=[a-z])(?=[A-Z])", " ");
+}

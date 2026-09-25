@@ -1,0 +1,108 @@
+@page "/carrito"
+@attribute [TenantHost]
+@implements IDisposable
+@inject CartState Cart
+@inject CatalogService Catalog
+
+<PageTitle>Carrito · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4" Class="mb-4">Tu carrito</MudText>
+
+@if (!Cart.Loaded || _items is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_items.Count == 0)
+{
+    <EmptyState Icon="@Icons.Material.Filled.RemoveShoppingCart" Title="Tu carrito está vacío">
+        <MudButton Href="/catalogo" Variant="Variant.Filled" Color="Color.Primary">Explorar catálogo</MudButton>
+    </EmptyState>
+}
+else
+{
+    <MudGrid>
+        <MudItem xs="12" md="8">
+            <MudPaper Outlined="true">
+                <MudList T="string" Dense="false">
+                    @foreach (var item in _items)
+                    {
+                        <MudListItem T="string" data-testid="cart-line">
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap">
+                                <MudStack Spacing="0" Style="min-width:220px">
+                                    <MudLink Href="@($"/producto/{item.Info.ProductSlug}")"><b>@item.Info.ProductName</b></MudLink>
+                                    <MudText Typo="Typo.caption">@item.Info.Variant.Description · SKU @item.Info.Variant.Sku</MudText>
+                                    @if (!item.Info.ProductActive || item.Info.Variant.Available < item.Quantity)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Error">
+                                            Solo hay @Math.Max(0, item.Info.Variant.Available) disponibles
+                                        </MudText>
+                                    }
+                                </MudStack>
+                                <MudNumericField T="int" Value="item.Quantity" ValueChanged="q => ChangeQuantity(item, q)"
+                                                 Min="1" Max="@CheckoutService.MaxQuantityPerLine" Variant="Variant.Outlined"
+                                                 Margin="Margin.Dense" Style="max-width:100px" />
+                                <MudText Style="min-width:120px" Align="Align.Right">
+                                    @Ui.Money(item.Info.Variant.Price * item.Quantity, Host.Currency)
+                                </MudText>
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Error"
+                                               OnClick="() => Remove(item)" aria-label="Quitar" />
+                            </MudStack>
+                        </MudListItem>
+                        <MudDivider />
+                    }
+                </MudList>
+            </MudPaper>
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <OrderSummary Subtotal="Subtotal" TaxRate="@(Host.Tenant?.TaxRate ?? 0.18m)" Currency="@Host.Currency">
+                <MudButton Href="/checkout" Variant="Variant.Filled" Color="Color.Primary" FullWidth="true" Size="Size.Large"
+                           Disabled="@HasProblems" data-testid="go-checkout">Continuar al pago</MudButton>
+            </OrderSummary>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+
+    private sealed record Item(CartVariantDto Info, int Quantity);
+
+    private List<Item>? _items;
+
+    private decimal Subtotal => _items?.Sum(i => i.Info.Variant.Price * i.Quantity) ?? 0;
+    private bool HasProblems => _items!.Any(i => !i.Info.ProductActive || i.Info.Variant.Available < i.Quantity);
+
+    protected override void OnInitialized() => Cart.Changed += OnCartChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Cart.EnsureLoadedAsync();
+            await LoadAsync();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        var info = await Catalog.GetCartVariantsAsync(Cart.Lines.Select(l => l.VariantId));
+        var byId = info.ToDictionary(i => i.Variant.Id);
+        // Descarta del carrito variantes que ya no existen.
+        foreach (var missing in Cart.Lines.Where(l => !byId.ContainsKey(l.VariantId)).ToList())
+            await Cart.RemoveAsync(missing.VariantId);
+        _items = Cart.Lines.Where(l => byId.ContainsKey(l.VariantId))
+            .Select(l => new Item(byId[l.VariantId], l.Quantity)).ToList();
+    }
+
+    private Task ChangeQuantity(Item item, int quantity) => Cart.SetQuantityAsync(item.Info.Variant.Id, quantity);
+    private Task Remove(Item item) => Cart.RemoveAsync(item.Info.Variant.Id);
+
+    private void OnCartChanged() => InvokeAsync(async () =>
+    {
+        if (Cart.Loaded)
+            await LoadAsync();
+        StateHasChanged();
+    });
+
+    public void Dispose() => Cart.Changed -= OnCartChanged;
+}

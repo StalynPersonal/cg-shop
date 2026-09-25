@@ -1,0 +1,44 @@
+@inject CatalogService Catalog
+
+<PageTitle>@Host.Tenant?.Name</PageTitle>
+
+<MudPaper Class="cg-hero pa-8 mb-6" Elevation="0">
+    <MudText Typo="Typo.h3">@Host.Tenant?.Name</MudText>
+    <MudText Typo="Typo.h6" Class="mt-2" Style="opacity:.9">
+        Ropa, gorras, relojes, perfumes y calzados. Paga por transferencia o enlace de pago.
+    </MudText>
+    <MudButton Href="/catalogo" Variant="Variant.Filled" Color="Color.Secondary" Class="mt-4"
+               EndIcon="@Icons.Material.Filled.ArrowForward">Ver catálogo</MudButton>
+</MudPaper>
+
+<MudGrid Spacing="2" Class="mb-6">
+    @foreach (var category in Enum.GetValues<ProductCategory>())
+    {
+        <MudItem xs="6" sm="4" md="2" Style="flex-grow:1">
+            <MudCard Outlined="true">
+                <MudCardActions Class="justify-center">
+                    <MudButton Href="@($"/catalogo/{Ui.CategorySlug(category)}")" StartIcon="@Ui.CategoryIcon(category)"
+                               Color="Color.Primary" FullWidth="true">@category.DisplayName()</MudButton>
+                </MudCardActions>
+            </MudCard>
+        </MudItem>
+    }
+</MudGrid>
+
+<MudText Typo="Typo.h5" Class="mb-3">Novedades</MudText>
+@if (_products is null)
+{
+    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <ProductGrid Products="_products.Items" Currency="@Host.Currency" />
+}
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    private PagedResult<ProductCardDto>? _products;
+
+    protected override async Task OnInitializedAsync() =>
+        _products = await Catalog.SearchAsync(new CatalogQuery(PageSize: 8));
+}
