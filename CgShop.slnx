@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CgShop.Api/CgShop.Api.csproj" />
+    <Project Path="src/CgShop.Application/CgShop.Application.csproj" />
+    <Project Path="src/CgShop.Domain/CgShop.Domain.csproj" />
+    <Project Path="src/CgShop.Infrastructure/CgShop.Infrastructure.csproj" />
+    <Project Path="src/CgShop.Web/CgShop.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CgShop.ComponentTests/CgShop.ComponentTests.csproj" />
+    <Project Path="tests/CgShop.IntegrationTests/CgShop.IntegrationTests.csproj" />
+    <Project Path="tests/CgShop.UnitTests/CgShop.UnitTests.csproj" />
+  </Folder>
+</Solution>
