@@ -1,6 +1,41 @@
-@CgShop.Api_HostAddress = http://localhost:5102
+@api = http://localhost:5102
 
-GET {{CgShop.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Catálogo público de la tienda verde
+GET {{api}}/api/store/catalog?category=Perfumes
+X-Tenant: verde
 
-###
+### Token del administrador de la tienda verde
+# @name login
+POST {{api}}/api/auth/token
+X-Tenant: verde
+Content-Type: application/json
+
+{ "email": "admin@verde.local", "password": "Admin123!" }
+
+### Pedidos pendientes de validación de pago
+GET {{api}}/api/admin/orders?status=PendingPaymentValidation
+X-Tenant: verde
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### Token del Super Admin (host admin.localhost)
+# @name superlogin
+POST {{api}}/api/auth/token
+Host: admin.localhost:5102
+Content-Type: application/json
+
+{ "email": "superadmin@cgshop.local", "password": "Admin123!" }
+
+### Crear empresa con color primario obligatorio
+POST {{api}}/api/superadmin/tenants
+Host: admin.localhost:5102
+Authorization: Bearer {{superlogin.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Tienda Azul",
+  "slug": "azul",
+  "primaryColor": "#1565C0",
+  "adminFullName": "Dueño Azul",
+  "adminEmail": "admin@azul.local",
+  "adminPassword": "Admin123!"
+}
