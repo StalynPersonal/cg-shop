@@ -36,11 +36,11 @@
         </MudBadge>
     </MudAppBar>
 
-    <MudMainContent>
-        <MudContainer MaxWidth="MaxWidth.Large" Class="py-6">
+    <MudMainContent Class="cg-sticky-footer-layout">
+        <MudContainer MaxWidth="MaxWidth.Large" Class="py-6 cg-main-grow">
             @Body
         </MudContainer>
-        <MudPaper Square="true" Elevation="0" Class="pa-6 mt-8 mud-theme-primary">
+        <MudPaper Square="true" Elevation="0" Class="pa-6 mt-8 mud-theme-primary" data-testid="store-footer">
             <MudText Align="Align.Center" Typo="Typo.body2">
                 © @DateTime.Now.Year @Host.Tenant?.Name · Pagos por transferencia o enlace de pago con validación manual
             </MudText>

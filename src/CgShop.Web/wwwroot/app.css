@@ -26,6 +26,17 @@ html, body {
     border-color: transparent;
 }
 
+/* Pie de página siempre al fondo: el contenido ocupa al menos el alto de la ventana */
+.cg-sticky-footer-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.cg-main-grow {
+    flex: 1 0 auto;
+}
+
 .cg-product-card {
     height: 100%;
     display: flex;
