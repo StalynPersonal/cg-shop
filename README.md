@@ -25,7 +25,7 @@ cg-shop/
 └─ tests/
    ├─ Shared/TestData.cs         Generador determinista: cada funcionalidad se prueba con lotes de 100 registros
    ├─ CgShop.UnitTests/          Dominio, servicios (EF InMemory) y middleware
-   ├─ CgShop.IntegrationTests/   SQL Server real (Testcontainers o LocalDB) + WebApplicationFactory de la API
+   ├─ CgShop.IntegrationTests/   SQL Server real (LocalDB, sin Docker) + WebApplicationFactory de la API
    └─ CgShop.ComponentTests/     bUnit: tema por tenant y páginas reales de la tienda y el panel
 ```
 
@@ -80,9 +80,9 @@ PendingPaymentValidation ──(TenantAdmin valida)──► PaymentValidated �
 ### Requisitos
 
 - **.NET SDK 10** (`dotnet --version` ≥ 10.0.100; el repo fija 10.0.401 en `global.json` con *roll-forward*).
-- **SQL Server**: LocalDB (incluido con Visual Studio), SQL Server Express/Developer o un contenedor Docker.
+- **SQL Server** instalado localmente: LocalDB (incluido con Visual Studio o descargable con SQL Server Express),
+  o SQL Server Express/Developer. **No se requiere Docker.**
 - Herramienta EF: `dotnet tool install -g dotnet-ef` (o `dotnet tool update -g dotnet-ef`).
-- *(Opcional)* **Docker Desktop**, para que las pruebas de integración usen Testcontainers.
 
 ### Paso a paso
 
@@ -102,11 +102,13 @@ dotnet ef database update --project src/CgShop.Infrastructure --startup-project 
 dotnet run --project src/CgShop.Web --launch-profile http
 ```
 
-SQL Server en Docker (alternativa a LocalDB):
+Con SQL Server Express o Developer instalado (alternativa a LocalDB):
 
 ```bash
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=CgShop_2026!" -p 1433:1433 -d mcr.microsoft.com/mssql/server:2022-latest
-# ConnectionStrings:Default = "Server=localhost,1433;Database=CgShop;User Id=sa;Password=CgShop_2026!;TrustServerCertificate=True"
+# Autenticación de Windows
+# ConnectionStrings:Default = "Server=.\SQLEXPRESS;Database=CgShop;Trusted_Connection=True;TrustServerCertificate=True"
+# Autenticación SQL
+# ConnectionStrings:Default = "Server=localhost;Database=CgShop;User Id=cgshop;Password=...;TrustServerCertificate=True"
 ```
 
 ### Subdominios en desarrollo
@@ -154,10 +156,15 @@ dotnet test CgShop.slnx
 | **IntegrationTests** | Aislamiento por `TenantId` en SQL Server real (100 productos por tenant), bloqueo de escritura cruzada, 100 compras concurrentes sin sobreventa, expiración, Super Admin (100 empresas) y API HTTP completa |
 | **ComponentTests** | bUnit: 100 tenants, cada uno renderiza su `--mud-palette-primary`; páginas reales de la tienda y el panel con 100 pedidos y productos; validación de pago desde el diálogo |
 
-**Base de datos de las pruebas de integración**, en este orden:
-1. `CGSHOP_TEST_SQL`, si la variable existe (cadena de conexión explícita).
-2. **Testcontainers** (`mssql/server:2022`), si Docker está disponible.
-3. **LocalDB**, con una base temporal `CgShopTests_{guid}` que se elimina al terminar.
+**Base de datos de las pruebas de integración** (sin Docker):
+1. `CGSHOP_TEST_SQL`, si la variable existe (cadena de conexión explícita a cualquier SQL Server).
+2. En caso contrario, **LocalDB**, con una base temporal `CgShopTests_{guid}` que se elimina al terminar.
+
+```bash
+# Ejemplo contra SQL Server Express (PowerShell)
+$env:CGSHOP_TEST_SQL = "Server=.\SQLEXPRESS;Database=CgShopTests;Trusted_Connection=True;TrustServerCertificate=True"
+dotnet test tests/CgShop.IntegrationTests
+```
 
 ---
 

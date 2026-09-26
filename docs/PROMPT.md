@@ -7,7 +7,7 @@ Actúa como un Arquitecto de Software Senior y Desarrollador Full-Stack .NET. Di
 * **Frontend Cliente & Admin:** Blazor .NET 10 (Interactive Server).
 * **UI Library:** MudBlazor.
 * **Base de Datos:** SQL Server — Shared Database with Tenant ID.
-* **Testing:** xUnit, NSubstitute, FluentAssertions 7.x, bUnit, Microsoft.AspNetCore.Mvc.Testing, Testcontainers.MsSql.
+* **Testing:** xUnit, NSubstitute, FluentAssertions 7.x, bUnit, Microsoft.AspNetCore.Mvc.Testing, SQL Server LocalDB para integración (sin Docker).
 
 ## 2. Dominio del Negocio (E-commerce Multicategoría)
 Ropa (tallas, colores, categorías), Gorras, Relojes, Perfumes (volúmenes, notas olfativas), Tenis y Calzados (gestión avanzada de tallas y variantes).

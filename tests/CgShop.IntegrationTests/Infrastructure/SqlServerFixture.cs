@@ -7,18 +7,16 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Testcontainers.MsSql;
 
 namespace CgShop.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// SQL Server real para pruebas de integración:
-/// 1) <c>CGSHOP_TEST_SQL</c> (cadena explícita), 2) Testcontainers (si Docker está disponible),
-/// 3) LocalDB con una base temporal única. Aplica las migraciones reales.
+/// SQL Server real para pruebas de integración (sin Docker):
+/// 1) <c>CGSHOP_TEST_SQL</c> (cadena explícita a cualquier SQL Server),
+/// 2) LocalDB con una base temporal única que se elimina al terminar. Aplica las migraciones reales.
 /// </summary>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
-    private MsSqlContainer? _container;
     private string? _localDbName;
 
     public string ConnectionString { get; private set; } = "";
@@ -33,10 +31,6 @@ public sealed class SqlServerFixture : IAsyncLifetime
         {
             ConnectionString = explicitConnection;
             Provider = "CGSHOP_TEST_SQL";
-        }
-        else if (await TryStartContainerAsync())
-        {
-            Provider = "Testcontainers";
         }
         else
         {
@@ -103,30 +97,10 @@ public sealed class SqlServerFixture : IAsyncLifetime
         return tenant;
     }
 
-    private async Task<bool> TryStartContainerAsync()
-    {
-        try
-        {
-            _container = new MsSqlBuilder("mcr.microsoft.com/mssql/server:2022-latest").Build();
-            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-            await _container.StartAsync(cts.Token);
-            ConnectionString = _container.GetConnectionString();
-            return true;
-        }
-        catch (Exception)
-        {
-            _container = null;
-            return false;
-        }
-    }
-
     public async Task DisposeAsync()
     {
         if (Services is IAsyncDisposable d)
             await d.DisposeAsync();
-
-        if (_container is not null)
-            await _container.DisposeAsync();
 
         if (_localDbName is not null)
         {
