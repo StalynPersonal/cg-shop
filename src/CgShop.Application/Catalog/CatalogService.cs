@@ -20,10 +20,28 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
             var audiences = audience.Includes();
             products = products.Where(p => audiences.Contains(p.Audience));
         }
-        if (!string.IsNullOrWhiteSpace(query.Search))
+        // Cada palabra debe aparecer en el nombre, la marca, la descripción, un color o la categoría
+        // ("tenis negro", "perfume dior"...). Sin distinguir mayúsculas.
+        foreach (var word in SearchWords(query.Search))
         {
-            var term = query.Search.Trim();
-            products = products.Where(p => p.Name.Contains(term) || (p.Brand != null && p.Brand.Contains(term)));
+            // "mujer", "hombres", "niños"... filtran por sección en lugar de buscar el texto.
+            if (AudienceWord(word) is { } wordAudience)
+            {
+                var included = wordAudience.Includes();
+                products = products.Where(p => included.Contains(p.Audience));
+                continue;
+            }
+
+            var categories = Enum.GetValues<ProductCategory>()
+                .Where(c => c.DisplayName().StartsWith(word, StringComparison.OrdinalIgnoreCase)
+                            || word.StartsWith(c.DisplayName().TrimEnd('s'), StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            products = products.Where(p =>
+                p.Name.ToLower().Contains(word)
+                || (p.Brand != null && p.Brand.ToLower().Contains(word))
+                || (p.Description != null && p.Description.ToLower().Contains(word))
+                || p.Variants.Any(v => v.Color != null && v.Color.ToLower().Contains(word))
+                || categories.Contains(p.Category));
         }
 
         if (!string.IsNullOrWhiteSpace(query.Size))
@@ -115,6 +133,25 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
 
         return new CatalogFacetsDto(categories.Order().ToList(), SortSizes(sizes), colors.Order().ToList());
     }
+
+    private static readonly HashSet<string> StopWords =
+        ["de", "del", "la", "las", "el", "los", "para", "con", "en", "un", "una", "por"];
+
+    /// <summary>Palabras de búsqueda en minúsculas (máximo 5; se ignoran artículos y preposiciones).</summary>
+    internal static List<string> SearchWords(string? search) =>
+        string.IsNullOrWhiteSpace(search)
+            ? []
+            : search.Trim().ToLowerInvariant()
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(w => w.Length > 1 && !StopWords.Contains(w)).Distinct().Take(5).ToList();
+
+    internal static ProductAudience? AudienceWord(string word) => word switch
+    {
+        "hombre" or "hombres" or "caballero" or "caballeros" => ProductAudience.Men,
+        "mujer" or "mujeres" or "dama" or "damas" => ProductAudience.Women,
+        "niño" or "niños" or "nino" or "ninos" or "niña" or "niñas" or "nina" or "ninas" or "infantil" => ProductAudience.Kids,
+        _ => null
+    };
 
     internal static List<string> SortSizes(IEnumerable<string> sizes)
     {

@@ -1,0 +1,48 @@
+@* Buscador de la tienda (cabecera). Sin conexión interactiva funciona como formulario GET normal. *@
+@implements IDisposable
+@inject NavigationManager Navigation
+
+<form class="@($"cg-search {Class}")" method="get" action="/catalogo" role="search"
+      @onsubmit="SearchAsync" @onsubmit:preventDefault data-testid="store-search">
+    <input type="search" name="q" @bind="_text" placeholder="¿Qué estás buscando?" aria-label="Buscar productos"
+           maxlength="100" autocomplete="off" enterkeyhint="search" data-testid="store-search-input" />
+    <button type="submit" aria-label="Buscar" data-testid="store-search-button">
+        <MudIcon Icon="@Icons.Material.Filled.Search" />
+    </button>
+</form>
+
+@code {
+    [Parameter] public string? Class { get; set; }
+
+    private string? _text;
+
+    protected override void OnInitialized()
+    {
+        _text = CurrentQuery();
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private Task SearchAsync()
+    {
+        var q = _text?.Trim();
+        Navigation.NavigateTo(string.IsNullOrEmpty(q) ? "/catalogo" : $"/catalogo?q={Uri.EscapeDataString(q)}");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>El texto sigue a la URL: se mantiene en /catalogo?q=... y se limpia al salir de la búsqueda.</summary>
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        _text = CurrentQuery();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private string? CurrentQuery()
+    {
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        return Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query).TryGetValue("q", out var q)
+            ? q.ToString()
+            : null;
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

@@ -14,7 +14,7 @@
     <MudHidden Breakpoint="Breakpoint.MdAndUp">
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
                    StartIcon="@(_showFilters ? Icons.Material.Filled.Close : Icons.Material.Filled.FilterList)"
-                   OnClick="() => _showFilters = !_showFilters" data-testid="toggle-filters">
+                   OnClick="() => _showFilters = !_showFilters" Class="flex-shrink-0 ml-2" data-testid="toggle-filters">
             Filtros
         </MudButton>
     </MudHidden>
@@ -24,10 +24,6 @@
     <MudItem xs="12" md="3" Class="@(_showFilters ? "" : "d-none d-md-block")">
         <MudPaper Class="pa-4" Outlined="true" data-testid="catalog-filters">
             <MudStack Spacing="3">
-                <MudTextField @bind-Value="_search" Label="Buscar" Adornment="Adornment.Start"
-                              AdornmentIcon="@Icons.Material.Filled.Search" Immediate="false"
-                              OnBlur="ReloadAsync" OnKeyUp="OnSearchKeyUp" Clearable="true"
-                              OnClearButtonClick="ReloadAsync" Variant="Variant.Outlined" Margin="Margin.Dense" />
                 <MudSelect T="string" Label="Para" Value="@(_audience?.Slug() ?? "")" ValueChanged="ChangeAudience"
                            Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="audience-filter">
                     <MudSelectItem Value="@("")">Todos</MudSelectItem>
@@ -86,7 +82,16 @@
         }
         else
         {
-            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">@_result.TotalCount productos</MudText>
+            <MudText Typo="Typo.body2" Class="mud-text-secondary mb-2">@_result.TotalCount @(_result.TotalCount == 1 ? "producto" : "productos")</MudText>
+            @if (_result.TotalCount == 0)
+            {
+                <MudPaper Outlined="true" Class="pa-8 text-center" data-testid="catalog-empty">
+                    <MudIcon Icon="@Icons.Material.Filled.SearchOff" Size="Size.Large" Class="mb-2" />
+                    <MudText Typo="Typo.h6">@(_search is null ? "No hay productos con estos filtros." : $"No encontramos productos para “{_search}”.")</MudText>
+                    <MudText Class="mud-text-secondary mb-4">Revisa la ortografía o prueba con otra palabra, marca o color.</MudText>
+                    <MudButton Href="/catalogo" Variant="Variant.Outlined" Color="Color.Primary">Ver todo el catálogo</MudButton>
+                </MudPaper>
+            }
             <ProductGrid Products="_result.Items" Currency="@Host.Currency" />
             @if (_result.TotalPages > 1)
             {
@@ -103,6 +108,7 @@
     [CascadingParameter] private HostContext Host { get; set; } = default!;
     [Parameter] public string? CategorySlug { get; set; }
     [Parameter] public string? AudienceSlug { get; set; }
+    [SupplyParameterFromQuery(Name = "q")] public string? Query { get; set; }
 
     private ProductCategory? _category;
     private ProductAudience? _audience;
@@ -120,6 +126,7 @@
     {
         _category = Ui.CategoryFromSlug(CategorySlug);
         _audience = ProductAudienceExtensions.FromSlug(AudienceSlug);
+        _search = string.IsNullOrWhiteSpace(Query) ? null : Query.Trim();
         _size = _color = null;
         _page = 1;
         _facets = await Catalog.GetFacetsAsync(_category, _audience);
@@ -136,12 +143,6 @@
         await LoadAsync();
     }
 
-    private async Task OnSearchKeyUp(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter")
-            await ReloadAsync();
-    }
-
     private async Task ChangePage(int page)
     {
         _page = page;
@@ -151,6 +152,7 @@
     /// <summary>"Hombre · Calzados", "Mujer", "Relojes"...</summary>
     private string? Title => (_audience, _category) switch
     {
+        (null, null) when _search is not null => $"Resultados para “{_search}”",
         (null, null) => null,
         ({ } a, null) => a.DisplayName(),
         (null, { } c) => c.DisplayName(),
@@ -158,8 +160,10 @@
     };
 
     private void ChangeCategory(string slug) =>
-        Navigation.NavigateTo(Ui.CatalogUrl(_audience, Ui.CategoryFromSlug(slug)));
+        Navigation.NavigateTo(WithQuery(Ui.CatalogUrl(_audience, Ui.CategoryFromSlug(slug))));
 
     private void ChangeAudience(string slug) =>
-        Navigation.NavigateTo(Ui.CatalogUrl(ProductAudienceExtensions.FromSlug(slug), _category));
+        Navigation.NavigateTo(WithQuery(Ui.CatalogUrl(ProductAudienceExtensions.FromSlug(slug), _category)));
+
+    private string WithQuery(string url) => _search is null ? url : $"{url}?q={Uri.EscapeDataString(_search)}";
 }

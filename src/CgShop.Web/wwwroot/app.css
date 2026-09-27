@@ -256,3 +256,50 @@ html, body {
     text-transform: uppercase;
     letter-spacing: .04em;
 }
+
+/* Buscador de la tienda: centrado en la cabecera (escritorio) o en franja propia (celular). */
+.cg-search {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    max-width: 640px;
+    margin-inline: auto;
+    height: 42px;
+    background: #fff;
+    border-radius: 21px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+}
+
+.cg-search input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    outline: 0;
+    padding: 0 18px;
+    font-size: 1rem;
+    color: #212121;
+    background: transparent;
+}
+
+.cg-search input::placeholder { color: #757575; }
+
+.cg-search button {
+    width: 52px;
+    height: 100%;
+    border: 0;
+    cursor: pointer;
+    color: var(--mud-palette-primary);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cg-search button:hover { background: rgba(0, 0, 0, .05); }
+
+.cg-search:focus-within { box-shadow: 0 0 0 3px var(--mud-palette-primary-lighten); }
+
+.cg-search-strip { padding: 8px 16px 12px; }
+.cg-search-strip .cg-search { max-width: none; }

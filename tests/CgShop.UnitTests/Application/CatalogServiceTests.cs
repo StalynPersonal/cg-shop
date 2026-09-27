@@ -168,6 +168,44 @@ public class CatalogServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Search_box_matches_words_in_any_case_across_brand_color_category_and_section()
+    {
+        var service = new CatalogService(_factory);
+        var all = TestData.Products(TestData.BatchSize, Guid.Empty).ToList();
+        async Task<int> Count(string q) => (await service.SearchAsync(new CatalogQuery(Search: q, PageSize: 200))).TotalCount;
+
+        (await Count("nike")).Should().Be(10);
+        (await Count("  NIKE  ")).Should().Be(10);
+
+        // Todas las palabras deben coincidir: marca + color.
+        var nikeRojo = all.Count(p => p.Brand == "Nike" && p.Variants.Any(v => v.Color == "Rojo"));
+        (await Count("nike rojo")).Should().Be(nikeRojo);
+
+        // Categoría en singular o plural.
+        (await Count("perfume")).Should().Be(20);
+        (await Count("relojes")).Should().Be(20);
+        (await Count("calzado")).Should().Be(20);
+
+        // "de" se ignora y "mujer" filtra por sección (Mujer + Unisex).
+        var ropaMujer = all.Count(p => p.Category == ProductCategory.Clothing
+                                       && p.Audience is ProductAudience.Women or ProductAudience.Unisex);
+        (await Count("ropa de mujer")).Should().Be(ropaMujer);
+        (await Count("niños")).Should().Be(25);
+
+        (await Count("descripción del producto 42")).Should().Be(1);
+        (await Count("xyzzy")).Should().Be(0);
+    }
+
+    [Fact]
+    public void Search_words_drop_stop_words_and_limit_count()
+    {
+        CatalogService.SearchWords("Tenis de la Mujer").Should().Equal("tenis", "mujer");
+        CatalogService.SearchWords("a b c").Should().BeEmpty();
+        CatalogService.SearchWords("uno dos tres cuatro cinco seis").Should().HaveCount(5);
+        CatalogService.SearchWords(null).Should().BeEmpty();
+    }
+
+    [Fact]
     public void Sizes_are_sorted_numerically_then_by_clothing_order()
     {
         CatalogService.SortSizes(["XL", "42", "S", "38", "M", "Ajustable", "40.5"])

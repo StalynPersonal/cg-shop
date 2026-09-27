@@ -59,6 +59,42 @@ public sealed class StorePagesTests : StoreTestContext
     }
 
     [Fact]
+    public async Task Search_query_shows_results_title_and_empty_state_over_100_products()
+    {
+        await SeedProductsAsync();
+        var navigation = Services.GetRequiredService<NavigationManager>();
+
+        navigation.NavigateTo("/catalogo?q=relojes");
+        var cut = Render<CatalogPage>(p => p.AddCascadingValue(HostContext));
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain("20 productos"));
+        cut.Find("[data-testid='catalog-title']").TextContent.Should().Be("Resultados para “relojes”");
+
+        navigation.NavigateTo("/catalogo?q=zzzz");
+        cut.Render();
+        cut.WaitForAssertion(() => cut.Find("[data-testid='catalog-empty']").TextContent
+            .Should().Contain("No encontramos productos para “zzzz”"));
+    }
+
+    [Fact]
+    public void Search_box_navigates_to_catalog_with_the_query()
+    {
+        var navigation = Services.GetRequiredService<NavigationManager>();
+        var cut = Render<CgShop.Web.Components.Shared.StoreSearchBox>();
+
+        foreach (var term in new[] { "tenis negro", "Perfume Dior", "gorra" })
+        {
+            cut.Find("[data-testid='store-search-input']").Change(term);
+            cut.Find("[data-testid='store-search']").Submit();
+            navigation.Uri.Should().EndWith($"/catalogo?q={Uri.EscapeDataString(term)}");
+            cut.Find("[data-testid='store-search-input']").GetAttribute("value").Should().Be(term);
+        }
+
+        cut.Find("[data-testid='store-search-input']").Change("   ");
+        cut.Find("[data-testid='store-search']").Submit();
+        navigation.Uri.Should().EndWith("/catalogo");
+    }
+
+    [Fact]
     public async Task Product_page_shows_variants_and_attributes_of_a_perfume()
     {
         await SeedProductsAsync();
