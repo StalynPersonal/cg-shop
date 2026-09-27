@@ -1,5 +1,6 @@
 @page "/checkout"
 @attribute [TenantHost]
+@attribute [Authorize]
 @inject CartState Cart
 @inject CatalogService Catalog
 @inject CheckoutService Checkout
@@ -96,8 +97,18 @@ else
     private string? _whatsApp;
     private readonly PlaceOrderRequest _request = new();
 
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
     protected override async Task OnInitializedAsync()
     {
+        // El pedido queda asociado al cliente autenticado ("Mis pedidos"); sus datos se precargan.
+        var user = (await AuthState).User;
+        var actor = user.ToActor();
+        _request.CustomerUserId = actor.UserId;
+        _request.FullName = actor.DisplayName;
+        _request.Email = user.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "";
+        _request.Phone = user.FindFirst(System.Security.Claims.ClaimTypes.MobilePhone)?.Value ?? "";
+
         _methods = await CustomerOrders.GetAvailablePaymentMethodsAsync();
         if (_methods.Count > 0)
             _request.PaymentMethod = _methods[0];

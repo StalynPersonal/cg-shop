@@ -24,17 +24,11 @@ public static class AuthEndpoints
     /// <summary>JWT para el tenant resuelto (subdominio o X-Tenant) o para admin.* (Super Admin).</summary>
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/auth/token", async (LoginRequest request, UserManager<ApplicationUser> users,
+        app.MapPost("/api/auth/token", async (LoginRequest request, TenantUserService tenantUsers,
             SignInManager<ApplicationUser> signIn, ITenantContext tenant, JwtTokenService tokens) =>
         {
-            var user = await users.FindByEmailAsync(request.Email ?? "");
+            var user = await tenantUsers.FindForLoginAsync(request.Email, tenant);
             if (user is null)
-                return Results.Unauthorized();
-
-            var allowed = tenant.IsAdminHost
-                ? await users.IsInRoleAsync(user, Roles.SuperAdmin)
-                : tenant.TenantId is { } tenantId && user.TenantId == tenantId;
-            if (!allowed)
                 return Results.Unauthorized();
 
             var check = await signIn.CheckPasswordSignInAsync(user, request.Password ?? "", lockoutOnFailure: true);
@@ -44,6 +38,15 @@ public static class AuthEndpoints
             var (token, expires) = await tokens.CreateAsync(user);
             return Results.Ok(new TokenResponse(token, expires));
         }).AllowAnonymous().WithTags("Auth");
+
+        // Registro de clientes de la tienda resuelta; devuelve directamente el token.
+        app.MapPost("/api/auth/register", async (RegisterCustomerRequest request, TenantUserService tenantUsers,
+            ITenantContext tenant, JwtTokenService tokens) =>
+        {
+            var user = await tenantUsers.RegisterCustomerAsync(request, tenant);
+            var (token, expires) = await tokens.CreateAsync(user);
+            return Results.Created("/api/store/my-orders", new TokenResponse(token, expires));
+        }).AllowAnonymous().WithTags("Auth").AddEndpointFilter(StoreEndpoints.RequireTenant);
 
         return app;
     }
@@ -67,12 +70,18 @@ public static class StoreEndpoints
         store.MapGet("/payment-methods", (CustomerOrderService orders, CancellationToken ct) =>
             orders.GetAvailablePaymentMethodsAsync(ct));
 
-        store.MapPost("/orders", async (PlaceOrderRequest request, CheckoutService checkout, CancellationToken ct) =>
+        // Comprar requiere cliente autenticado: el pedido queda asociado al usuario del token.
+        store.MapPost("/orders", async (PlaceOrderRequest request, CheckoutService checkout, HttpContext http,
+            CancellationToken ct) =>
         {
-            request.CustomerUserId = null; // la API pública no acepta identidades del cliente
+            request.CustomerUserId = http.User.ToActor().UserId; // nunca se confía en el valor del cuerpo
             var result = await checkout.PlaceOrderAsync(request, ct);
             return Results.Created($"/api/store/orders/{result.Number}?token={result.AccessToken}", result);
-        });
+        }).RequireAuthorization();
+
+        store.MapGet("/my-orders", (CustomerOrderService orders, HttpContext http, int? page, int? pageSize,
+                CancellationToken ct) =>
+            orders.ListMineAsync(http.User.ToActor().UserId, page ?? 1, pageSize ?? 10, ct)).RequireAuthorization();
 
         store.MapGet("/orders/{number}", async (string number, string token, CustomerOrderService orders,
                 CancellationToken ct) =>

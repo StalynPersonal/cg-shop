@@ -83,7 +83,7 @@ public sealed class ApiTests(SqlServerFixture fx) : IAsyncLifetime
     public async Task Full_flow_100_orders_placed_and_payments_validated_by_owner_via_api()
     {
         var tenant = await _api.CreateTenantAsync();
-        var store = _api.ClientFor(tenant.Slug);
+        var store = await _api.CustomerClientAsync(tenant.Slug);
         var variants = await VariantIdsAsync(store);
 
         var placed = new List<PlaceOrderResult>();
@@ -118,16 +118,55 @@ public sealed class ApiTests(SqlServerFixture fx) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Ordering_requires_login_and_my_orders_shows_only_own_orders()
+    {
+        var tenant = await _api.CreateTenantAsync(products: 5);
+        var anonymous = _api.ClientFor(tenant.Slug);
+        var variants = await VariantIdsAsync(anonymous);
+
+        (await anonymous.PostAsJsonAsync("/api/store/orders", Order(0, variants[0]), Json))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        var alice = await _api.CustomerClientAsync(tenant.Slug);
+        var bob = await _api.CustomerClientAsync(tenant.Slug);
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var client = i % 4 == 0 ? bob : alice; // 25 de Bob, 75 de Alice
+            var request = Order(i, variants[i % variants.Count]);
+            request.CustomerUserId = "intento-de-suplantacion"; // la API lo ignora y usa el token
+            (await client.PostAsJsonAsync("/api/store/orders", request, Json)).StatusCode.Should().Be(HttpStatusCode.Created);
+        }
+
+        (await alice.GetFromJsonAsync<PagedResult<CustomerOrderRowDto>>("/api/store/my-orders?pageSize=200", Json))!
+            .TotalCount.Should().Be(75);
+        (await bob.GetFromJsonAsync<PagedResult<CustomerOrderRowDto>>("/api/store/my-orders?pageSize=200", Json))!
+            .TotalCount.Should().Be(25);
+        (await anonymous.GetAsync("/api/store/my-orders")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // Un cliente de esta tienda no obtiene token en otra tienda (cuentas aisladas por tienda).
+        var other = await _api.CreateTenantAsync(products: 1);
+        var email = $"unico-{Guid.NewGuid():N}@correo.com";
+        await _api.CustomerClientAsync(tenant.Slug, email);
+        (await _api.ClientFor(other.Slug).PostAsJsonAsync("/api/auth/token", new LoginRequest(email, ApiFactory.Password)))
+            .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Staff_and_anonymous_cannot_validate_payments()
     {
         var tenant = await _api.CreateTenantAsync(products: 5);
-        var store = _api.ClientFor(tenant.Slug);
+        var store = await _api.CustomerClientAsync(tenant.Slug);
         var variants = await VariantIdsAsync(store);
         var order = await (await store.PostAsJsonAsync("/api/store/orders", Order(1, variants[0]), Json))
             .Content.ReadFromJsonAsync<PlaceOrderResult>(Json);
 
-        (await store.PostAsJsonAsync($"/api/admin/orders/{order!.OrderId}/validate-payment", new NoteRequest(null), Json))
+        var anonymous = _api.ClientFor(tenant.Slug);
+        (await anonymous.PostAsJsonAsync($"/api/admin/orders/{order!.OrderId}/validate-payment", new NoteRequest(null), Json))
             .StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+
+        // El propio cliente tampoco puede validar su pago.
+        (await store.PostAsJsonAsync($"/api/admin/orders/{order.OrderId}/validate-payment", new NoteRequest(null), Json))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         var staff = await _api.AuthenticatedClientAsync(tenant.Slug, $"staff@{tenant.Slug}.test");
         (await staff.PostAsJsonAsync($"/api/admin/orders/{order.OrderId}/validate-payment", new NoteRequest(null), Json))
@@ -161,7 +200,7 @@ public sealed class ApiTests(SqlServerFixture fx) : IAsyncLifetime
     public async Task Customer_uploads_receipt_via_multipart()
     {
         var tenant = await _api.CreateTenantAsync(products: 3);
-        var store = _api.ClientFor(tenant.Slug);
+        var store = await _api.CustomerClientAsync(tenant.Slug);
         var variants = await VariantIdsAsync(store);
         var order = await (await store.PostAsJsonAsync("/api/store/orders", Order(1, variants[0]), Json))
             .Content.ReadFromJsonAsync<PlaceOrderResult>(Json);

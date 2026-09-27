@@ -17,17 +17,12 @@ public static class AccountEndpoints
     {
         app.MapPost("/cuenta/login", async ([FromForm] string email, [FromForm] string password,
             [FromForm] string? returnUrl, SignInManager<ApplicationUser> signIn, UserManager<ApplicationUser> users,
-            ITenantContext tenant) =>
+            TenantUserService tenantUsers, ITenantContext tenant) =>
         {
             var failure = $"/cuenta/login?error=1&returnUrl={Uri.EscapeDataString(returnUrl ?? "")}";
-            var user = await users.FindByEmailAsync(email ?? "");
+            // Solo usuarios del host actual (tienda) o Super Admin en admin.*.
+            var user = await tenantUsers.FindForLoginAsync(email, tenant);
             if (user is null)
-                return Results.LocalRedirect(failure);
-
-            var allowed = tenant.IsAdminHost
-                ? await users.IsInRoleAsync(user, Roles.SuperAdmin)
-                : tenant.TenantId is { } tenantId && user.TenantId == tenantId;
-            if (!allowed)
                 return Results.LocalRedirect(failure);
 
             var result = await signIn.PasswordSignInAsync(user, password ?? "", isPersistent: true, lockoutOnFailure: true);
@@ -36,8 +31,38 @@ public static class AccountEndpoints
             if (!result.Succeeded)
                 return Results.LocalRedirect(failure);
 
-            var target = IsLocal(returnUrl) ? returnUrl! : tenant.IsAdminHost ? "/" : "/admin";
-            return Results.LocalRedirect(target);
+            var roles = await users.GetRolesAsync(user);
+            return Results.LocalRedirect(LoginRedirect.Resolve(roles, returnUrl, tenant.IsAdminHost));
+        });
+
+        app.MapPost("/cuenta/registro", async ([FromForm] string fullName, [FromForm] string email,
+            [FromForm] string phone, [FromForm] string password, [FromForm] string confirmPassword,
+            [FromForm] string? returnUrl, TenantUserService tenantUsers, SignInManager<ApplicationUser> signIn,
+            ITenantContext tenant) =>
+        {
+            string Fail(string message) =>
+                $"/cuenta/registro?error={Uri.EscapeDataString(message)}&returnUrl={Uri.EscapeDataString(returnUrl ?? "")}" +
+                $"&nombre={Uri.EscapeDataString(fullName ?? "")}&correo={Uri.EscapeDataString(email ?? "")}" +
+                $"&telefono={Uri.EscapeDataString(phone ?? "")}";
+
+            if (!tenant.HasTenant)
+                return Results.NotFound();
+            if (password != confirmPassword)
+                return Results.LocalRedirect(Fail("Las contraseñas no coinciden."));
+
+            ApplicationUser user;
+            try
+            {
+                user = await tenantUsers.RegisterCustomerAsync(new RegisterCustomerRequest(fullName ?? "", email ?? "",
+                    phone ?? "", password ?? ""), tenant);
+            }
+            catch (CgShop.Application.Common.ValidationException ex)
+            {
+                return Results.LocalRedirect(Fail(string.Join(" ", ex.Errors)));
+            }
+
+            await signIn.SignInAsync(user, isPersistent: true);
+            return Results.LocalRedirect(LoginRedirect.Resolve([Roles.Customer], returnUrl, isAdminHost: false));
         });
 
         app.MapPost("/cuenta/logout", async (SignInManager<ApplicationUser> signIn) =>
@@ -56,7 +81,36 @@ public static class AccountEndpoints
         return app;
     }
 
-    private static bool IsLocal(string? url) =>
+}
+
+/// <summary>
+/// Destino tras iniciar sesión:
+/// propietario/empleado → panel de administración (/admin); cliente → su panel (/mi-cuenta)
+/// o la página de la que venía (p. ej. /checkout). En admin.* el Super Admin va al inicio.
+/// </summary>
+public static class LoginRedirect
+{
+    public const string AdminPanel = "/admin";
+    public const string CustomerPanel = "/mi-cuenta";
+
+    public static string Resolve(IEnumerable<string> roles, string? returnUrl, bool isAdminHost)
+    {
+        var local = IsLocal(returnUrl) ? returnUrl : null;
+        if (isAdminHost)
+            return local ?? "/";
+
+        var roleSet = roles.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var isStoreStaff = roleSet.Contains(Roles.TenantAdmin) || roleSet.Contains(Roles.TenantStaff);
+        if (isStoreStaff)
+            return local is not null && local.StartsWith(AdminPanel, StringComparison.OrdinalIgnoreCase) ? local : AdminPanel;
+
+        // Clientes: nunca al panel de administración.
+        return local is not null && !local.StartsWith(AdminPanel, StringComparison.OrdinalIgnoreCase) && local != "/"
+            ? local
+            : CustomerPanel;
+    }
+
+    public static bool IsLocal(string? url) =>
         !string.IsNullOrEmpty(url) && url[0] == '/' && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'));
 }
 

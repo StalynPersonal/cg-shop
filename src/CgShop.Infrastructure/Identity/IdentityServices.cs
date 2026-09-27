@@ -19,6 +19,8 @@ public sealed class CgUserClaimsPrincipalFactory(
         if (user.TenantId is { } tenantId)
             identity.AddClaim(new Claim(CgClaimTypes.TenantId, tenantId.ToString()));
         identity.AddClaim(new Claim(CgClaimTypes.FullName, user.FullName));
+        if (!string.IsNullOrWhiteSpace(user.PhoneNumber))
+            identity.AddClaim(new Claim(ClaimTypes.MobilePhone, user.PhoneNumber));
         return identity;
     }
 }

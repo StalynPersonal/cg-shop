@@ -83,7 +83,7 @@ public abstract class StoreTestContext : MudTestContext
     }
 
     /// <summary>Crea pedidos reales vía CheckoutService (reservan stock).</summary>
-    protected async Task<List<PlaceOrderResult>> SeedOrdersAsync(int count = TestData.BatchSize)
+    protected async Task<List<PlaceOrderResult>> SeedOrdersAsync(int count = TestData.BatchSize, string? customerUserId = null)
     {
         await using var db = CreateDb();
         var variants = await db.ProductVariants.AsNoTracking().Select(v => v.Id).ToListAsync();
@@ -96,7 +96,7 @@ public abstract class StoreTestContext : MudTestContext
         {
             results.Add(await checkout.PlaceOrderAsync(new PlaceOrderRequest
             {
-                FullName = $"Cliente {i:000}", Email = $"cliente{i}@correo.com", Phone = "809", ShippingAddress = "Calle 1",
+                CustomerUserId = customerUserId ?? $"cliente-{i % 10}", FullName = $"Cliente {i:000}", Email = $"cliente{i}@correo.com", Phone = "809", ShippingAddress = "Calle 1",
                 Lines = [new CartLine(variants[i % variants.Count], 1)]
             }));
         }

@@ -45,6 +45,7 @@ public class OrderServicesTests : IAsyncLifetime
 
     private PlaceOrderRequest Request(int i, int qty = 1) => new()
     {
+        CustomerUserId = $"cliente-{i % 10}",
         FullName = $"Cliente {i}",
         Email = $"c{i}@correo.com",
         Phone = "809",
@@ -85,7 +86,7 @@ public class OrderServicesTests : IAsyncLifetime
         await checkout.Invoking(c => c.PlaceOrderAsync(link))
             .Should().ThrowAsync<DomainException>().WithMessage("*método de pago*");
 
-        var invalid = new PlaceOrderRequest();
+        var invalid = new PlaceOrderRequest { CustomerUserId = "cliente-1" };
         var ex = await checkout.Invoking(c => c.PlaceOrderAsync(invalid)).Should().ThrowAsync<ValidationException>();
         ex.Which.Errors.Should().HaveCountGreaterThanOrEqualTo(4);
 
@@ -135,6 +136,41 @@ public class OrderServicesTests : IAsyncLifetime
         pickup.ShippingAddress = null;
         pickup.DeliveryMethod = DeliveryMethod.Pickup;
         (await checkout.PlaceOrderAsync(pickup)).Number.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public async Task Checkout_requires_an_authenticated_customer()
+    {
+        var anonymous = Request(0);
+        anonymous.CustomerUserId = null;
+
+        await Checkout().Invoking(c => c.PlaceOrderAsync(anonymous))
+            .Should().ThrowAsync<ForbiddenException>().WithMessage("*iniciar sesión*");
+    }
+
+    [Fact]
+    public async Task My_orders_lists_only_the_customer_orders_out_of_100()
+    {
+        var checkout = Checkout();
+        for (var i = 0; i < TestData.BatchSize; i++)
+            await checkout.PlaceOrderAsync(Request(i)); // 10 clientes x 10 pedidos
+
+        var customers = new CustomerOrderService(_factory, _factory.Context, _storage, _clock, _options,
+            NullLogger<CustomerOrderService>.Instance);
+
+        for (var c = 0; c < 10; c++)
+        {
+            var mine = await customers.ListMineAsync($"cliente-{c}", 1, 50);
+            mine.TotalCount.Should().Be(10);
+            mine.Items.Should().OnlyHaveUniqueItems(o => o.Number);
+            (await customers.GetAsync(mine.Items[0].Number, mine.Items[0].AccessToken)).Should().NotBeNull();
+        }
+
+        (await customers.ListMineAsync("cliente-sin-pedidos")).TotalCount.Should().Be(0);
+        var paged = await customers.ListMineAsync("cliente-0", 2, 4);
+        paged.Items.Should().HaveCount(4);
+        paged.TotalPages.Should().Be(3);
+        await customers.Invoking(s => s.ListMineAsync(" ")).Should().ThrowAsync<ForbiddenException>();
     }
 
     [Fact]

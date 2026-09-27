@@ -27,8 +27,24 @@
             </MudStack>
         </MudHidden>
         <MudSpacer />
-        <AuthorizeView Policy="@Policies.TenantStaff">
-            <MudButton Href="/admin" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Dashboard">Panel</MudButton>
+        <AuthorizeView>
+            <Authorized>
+                @if (context.User.IsInRole(Roles.TenantAdmin) || context.User.IsInRole(Roles.TenantStaff))
+                {
+                    <MudButton Href="/admin" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Dashboard"
+                               data-testid="nav-admin">Panel</MudButton>
+                }
+                else
+                {
+                    <MudButton Href="/mi-cuenta" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AccountCircle"
+                               data-testid="nav-account">Mi cuenta</MudButton>
+                }
+                <LogoutButton />
+            </Authorized>
+            <NotAuthorized>
+                <MudButton Href="/cuenta/login" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login"
+                           data-testid="nav-login">Ingresar</MudButton>
+            </NotAuthorized>
         </AuthorizeView>
         <MudBadge Content="@Cart.Count" Visible="@(Cart.Count > 0)" Color="Color.Secondary" Overlap="true" Class="mx-2">
             <MudIconButton Href="/carrito" Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit"

@@ -79,6 +79,18 @@ public sealed record PaymentInstructionsDto(
     string? PickupAddress,
     string? WhatsAppNumber);
 
+/// <summary>Pedido en "Mis pedidos". Incluye el token porque el dueño autenticado puede abrir su pedido.</summary>
+public sealed record CustomerOrderRowDto(
+    string Number,
+    string AccessToken,
+    OrderStatus Status,
+    DeliveryMethod DeliveryMethod,
+    decimal Total,
+    string Currency,
+    int ItemCount,
+    DateTime CreatedAtUtc,
+    DateTime ReservationExpiresAtUtc);
+
 public sealed record OrderQuery(OrderStatus? Status = null, string? Search = null, int Page = 1, int PageSize = 25);
 
 public sealed record DashboardDto(

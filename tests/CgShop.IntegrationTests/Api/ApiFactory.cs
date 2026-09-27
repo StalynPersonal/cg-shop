@@ -57,6 +57,18 @@ public sealed class ApiFactory(SqlServerFixture fx) : WebApplicationFactory<Prog
         return client;
     }
 
+    /// <summary>Registra un cliente nuevo en la tienda y devuelve un cliente HTTP autenticado como él.</summary>
+    public async Task<HttpClient> CustomerClientAsync(string slug, string? email = null)
+    {
+        var client = ClientFor(slug);
+        var response = await client.PostAsJsonAsync("/api/auth/register", new CgShop.Infrastructure.Identity.RegisterCustomerRequest(
+            "Cliente API", email ?? $"cliente-{Guid.NewGuid():N}@correo.com", "809-555-0000", Password));
+        response.StatusCode.Should().Be(System.Net.HttpStatusCode.Created);
+        var token = await response.Content.ReadFromJsonAsync<TokenResponse>();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token!.AccessToken);
+        return client;
+    }
+
     /// <summary>Crea un tenant con 'stockProducts' productos y usuarios admin@/staff@.</summary>
     public async Task<Tenant> CreateTenantAsync(int products = TestData.BatchSize, int stock = 100)
     {

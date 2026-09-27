@@ -46,7 +46,8 @@ public static class DependencyInjection
         services.AddHttpContextAccessor();
         services.AddIdentityCore<ApplicationUser>(o =>
             {
-                o.User.RequireUniqueEmail = true;
+                // El correo es único POR TIENDA (ver TenantUserService), no global.
+                o.User.RequireUniqueEmail = false;
                 o.Password.RequiredLength = 8;
                 o.Password.RequireNonAlphanumeric = false;
                 o.Lockout.MaxFailedAccessAttempts = 5;
@@ -54,9 +55,11 @@ public static class DependencyInjection
             .AddRoles<IdentityRole>()
             .AddEntityFrameworkStores<AppDbContext>()
             .AddSignInManager()
+            .AddErrorDescriber<SpanishIdentityErrorDescriber>()
             .AddDefaultTokenProviders();
         services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, CgUserClaimsPrincipalFactory>();
         services.AddScoped<ITenantAdminProvisioner, IdentityTenantAdminProvisioner>();
+        services.AddScoped<TenantUserService>();
 
         services.AddSingleton<IFileStorage, LocalFileStorage>();
         services.AddScoped<INotificationService, LogNotificationService>();

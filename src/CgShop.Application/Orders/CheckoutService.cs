@@ -26,6 +26,8 @@ public sealed class CheckoutService(
     public async Task<PlaceOrderResult> PlaceOrderAsync(PlaceOrderRequest request, CancellationToken ct = default)
     {
         var tenantInfo = Guard.RequireTenant(tenantContext);
+        if (string.IsNullOrWhiteSpace(request.CustomerUserId))
+            throw new ForbiddenException("Debes iniciar sesión para realizar un pedido.");
         Validate(request);
 
         var requested = request.Lines.GroupBy(l => l.VariantId)

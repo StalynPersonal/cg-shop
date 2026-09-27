@@ -132,6 +132,12 @@ También se admite `*.lvh.me` (dominio público que apunta a 127.0.0.1). En desa
 | `superadmin@cgshop.local` | SuperAdmin | admin.localhost |
 | `admin@verde.local` / `admin@rojo.local` | TenantAdmin (valida pagos) | verde. / rojo. |
 | `staff@verde.local` / `staff@rojo.local` | TenantStaff (catálogo, inventario, despacho) | verde. / rojo. |
+| `cliente@verde.local` / `cliente@rojo.local` | Customer (compra y ve sus pedidos) | verde. / rojo. |
+
+**Cuentas de cliente.** Para comprar hay que iniciar sesión. Cualquier persona puede registrarse en
+`/cuenta/registro`. Las cuentas son **por tienda**: el mismo correo puede registrarse en tiendas distintas.
+Al iniciar sesión, el propietario y los empleados van al panel (`/admin`), y el cliente va a su panel
+`/mi-cuenta` ("Mis pedidos") o vuelve a la página de la que venía (por ejemplo, el checkout).
 
 ### API
 

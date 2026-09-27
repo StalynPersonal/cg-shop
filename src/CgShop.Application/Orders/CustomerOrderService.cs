@@ -28,6 +28,24 @@ public sealed class CustomerOrderService(
         return order is null ? null : OrderMapper.ToDetail(order);
     }
 
+    /// <summary>Pedidos del cliente autenticado en la tienda actual (el filtro global limita al tenant).</summary>
+    public async Task<PagedResult<CustomerOrderRowDto>> ListMineAsync(string userId, int page = 1, int pageSize = 10,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(userId))
+            throw new ForbiddenException("Debes iniciar sesión.");
+        (page, pageSize) = Guard.Paging(page, pageSize);
+        await using var db = dbFactory.CreateDbContext();
+        var query = db.Orders.AsNoTracking().Where(o => o.CustomerUserId == userId);
+        var total = await query.CountAsync(ct);
+        var items = await query.OrderByDescending(o => o.CreatedAtUtc).ThenByDescending(o => o.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(o => new CustomerOrderRowDto(o.Number, o.AccessToken, o.Status, o.DeliveryMethod, o.Total,
+                o.Currency, o.Items.Sum(i => i.Quantity), o.CreatedAtUtc, o.ReservationExpiresAtUtc))
+            .ToListAsync(ct);
+        return new PagedResult<CustomerOrderRowDto>(items, total, page, pageSize);
+    }
+
     public async Task<PaymentInstructionsDto> GetPaymentInstructionsAsync(PaymentMethod method,
         CancellationToken ct = default)
     {

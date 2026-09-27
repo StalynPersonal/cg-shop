@@ -7,7 +7,7 @@
         <MudPaper Class="pa-8" Elevation="3">
             <MudStack Spacing="3">
                 <MudText Typo="Typo.h5">
-                    @(Host.IsAdmin ? "Acceso Super Admin" : $"Acceso al panel de {Host.Tenant?.Name}")
+                    @(Host.IsAdmin ? "Acceso Super Admin" : $"Iniciar sesión en {Host.Tenant?.Name}")
                 </MudText>
                 @if (Error == "lockout")
                 {
@@ -16,6 +16,10 @@
                 else if (Error is not null)
                 {
                     <MudAlert Severity="Severity.Error">Credenciales inválidas o el usuario no pertenece a este sitio.</MudAlert>
+                }
+                else if (Host.IsTenant && ReturnUrl?.StartsWith("/checkout", StringComparison.OrdinalIgnoreCase) == true)
+                {
+                    <MudAlert Severity="Severity.Info" Dense="true">Inicia sesión o crea tu cuenta para completar tu compra.</MudAlert>
                 }
 
                 @* POST HTTP clásico: el inicio de sesión con cookie requiere una respuesta HTTP. *@
@@ -35,6 +39,14 @@
                                    Size="Size.Large" FullWidth="true">Entrar</MudButton>
                     </MudStack>
                 </form>
+                @if (Host.IsTenant)
+                {
+                    <MudDivider />
+                    <MudText Align="Align.Center">
+                        ¿No tienes cuenta?
+                        <MudLink Href="@RegisterUrl" data-testid="register-link"><b>Crear cuenta</b></MudLink>
+                    </MudText>
+                }
             </MudStack>
         </MudPaper>
     </MudItem>
@@ -44,4 +56,8 @@
     [CascadingParameter] private HostContext Host { get; set; } = default!;
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
     [SupplyParameterFromQuery] public string? Error { get; set; }
+
+    private string RegisterUrl => string.IsNullOrEmpty(ReturnUrl)
+        ? "/cuenta/registro"
+        : $"/cuenta/registro?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
 }

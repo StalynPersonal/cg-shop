@@ -1,0 +1,68 @@
+@page "/cuenta/registro"
+@attribute [TenantHost]
+
+<PageTitle>Crear cuenta · @Host.Tenant?.Name</PageTitle>
+
+<MudGrid Justify="Justify.Center" Class="mt-6">
+    <MudItem xs="12" sm="8" md="6">
+        <MudPaper Class="pa-8" Elevation="3">
+            <MudStack Spacing="3">
+                <MudText Typo="Typo.h5">Crear cuenta en @Host.Tenant?.Name</MudText>
+                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                    Con tu cuenta puedes comprar y consultar el estado de tus pedidos en cualquier momento.
+                </MudText>
+                @if (Error is not null)
+                {
+                    <MudAlert Severity="Severity.Error" data-testid="register-error">@Error</MudAlert>
+                }
+
+                @* POST HTTP clásico: crea la cuenta e inicia sesión con cookie. *@
+                <form method="post" action="/cuenta/registro" data-enhance="false">
+                    <AntiforgeryToken />
+                    <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+                    <MudStack Spacing="3">
+                        <label class="cg-field">
+                            <span>Nombre completo</span>
+                            <input name="fullName" autocomplete="name" required maxlength="150" value="@Nombre" />
+                        </label>
+                        <label class="cg-field">
+                            <span>Correo electrónico</span>
+                            <input name="email" type="email" autocomplete="email" required maxlength="200" value="@Correo" />
+                        </label>
+                        <label class="cg-field">
+                            <span>Teléfono</span>
+                            <input name="phone" type="tel" autocomplete="tel" required maxlength="30" value="@Telefono" />
+                        </label>
+                        <label class="cg-field">
+                            <span>Contraseña (mínimo 8 caracteres, con mayúscula, minúscula y número)</span>
+                            <input name="password" type="password" autocomplete="new-password" required minlength="8" />
+                        </label>
+                        <label class="cg-field">
+                            <span>Confirmar contraseña</span>
+                            <input name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
+                        </label>
+                        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary"
+                                   Size="Size.Large" FullWidth="true">Crear cuenta</MudButton>
+                    </MudStack>
+                </form>
+                <MudText Align="Align.Center">
+                    ¿Ya tienes cuenta?
+                    <MudLink Href="@LoginUrl"><b>Iniciar sesión</b></MudLink>
+                </MudText>
+            </MudStack>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    [CascadingParameter] private HostContext Host { get; set; } = default!;
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? Nombre { get; set; }
+    [SupplyParameterFromQuery] public string? Correo { get; set; }
+    [SupplyParameterFromQuery] public string? Telefono { get; set; }
+
+    private string LoginUrl => string.IsNullOrEmpty(ReturnUrl)
+        ? "/cuenta/login"
+        : $"/cuenta/login?returnUrl={Uri.EscapeDataString(ReturnUrl)}";
+}

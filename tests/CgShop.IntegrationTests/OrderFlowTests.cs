@@ -30,6 +30,7 @@ public sealed class OrderFlowTests(SqlServerFixture fx)
 
     private static PlaceOrderRequest Request(int i, IReadOnlyList<Guid> variantIds, int qty = 1) => new()
     {
+        CustomerUserId = $"cliente-{i % 10}",
         FullName = $"Cliente {i}",
         Email = $"cliente{i}@correo.com",
         Phone = "809-555-0000",

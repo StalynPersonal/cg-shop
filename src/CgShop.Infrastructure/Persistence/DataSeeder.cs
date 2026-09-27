@@ -36,12 +36,14 @@ public sealed class DataSeeder(
             if (!await roles.RoleExistsAsync(role))
                 await roles.CreateAsync(new IdentityRole(role));
 
-        if (await users.FindByEmailAsync(SuperAdminEmail) is null)
+        // Por nombre de usuario (único global); el correo puede repetirse entre tiendas.
+        if (await users.FindByNameAsync(SuperAdminEmail) is null)
             await CreateUserAsync(SuperAdminEmail, "Super Administrador", null, Roles.SuperAdmin);
 
         if (await db.Tenants.AnyAsync(ct))
         {
             await BackfillDemoContactAsync(ct);
+            await BackfillDemoCustomersAsync(ct);
             return;
         }
 
@@ -75,6 +77,8 @@ public sealed class DataSeeder(
 
         await CreateUserAsync($"admin@{slug}.local", $"Dueño {name}", tenant.Id, Roles.TenantAdmin);
         await CreateUserAsync($"staff@{slug}.local", $"Empleado {name}", tenant.Id, Roles.TenantStaff);
+        var customer = await CreateUserAsync(CustomerEmail(slug), $"Cliente {name}", tenant.Id, Roles.Customer,
+            "809-555-0101");
 
         // Catálogo y órdenes dentro de un scope con el tenant activo (mismo camino que producción).
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -91,9 +95,10 @@ public sealed class DataSeeder(
         {
             await checkout.PlaceOrderAsync(new PlaceOrderRequest
             {
-                FullName = $"Cliente Demo {i + 1}",
-                Email = $"cliente{i + 1}@correo.com",
-                Phone = $"809-555-000{i}",
+                CustomerUserId = customer.Id,
+                FullName = customer.FullName,
+                Email = customer.Email!,
+                Phone = customer.PhoneNumber!,
                 DeliveryMethod = i == 1 ? DeliveryMethod.Pickup : DeliveryMethod.Shipping,
                 ShippingAddress = i == 1 ? null : $"Av. Winston Churchill #{10 + i}, Santo Domingo",
                 PaymentMethod = i % 2 == 0 ? PaymentMethod.BankTransfer : PaymentMethod.PaymentLink,
@@ -125,16 +130,34 @@ public sealed class DataSeeder(
         await db.SaveChangesAsync(ct);
     }
 
-    private async Task CreateUserAsync(string email, string fullName, Guid? tenantId, string role)
+    public static string CustomerEmail(string slug) => $"cliente@{slug}.local";
+
+    /// <summary>Crea el cliente demo en tiendas sembradas antes de existir las cuentas de cliente.</summary>
+    private async Task BackfillDemoCustomersAsync(CancellationToken ct)
+    {
+        foreach (var tenant in await db.Tenants.Where(t => t.Slug == "verde" || t.Slug == "rojo").ToListAsync(ct))
+        {
+            var email = CustomerEmail(tenant.Slug);
+            var normalized = users.NormalizeEmail(email);
+            if (!await users.Users.AnyAsync(u => u.NormalizedEmail == normalized && u.TenantId == tenant.Id, ct))
+                await CreateUserAsync(email, $"Cliente {tenant.Name}", tenant.Id, Roles.Customer, "809-555-0101");
+        }
+    }
+
+    private async Task<ApplicationUser> CreateUserAsync(string email, string fullName, Guid? tenantId, string role,
+        string? phone = null)
     {
         var user = new ApplicationUser
         {
-            UserName = email, Email = email, EmailConfirmed = true, FullName = fullName, TenantId = tenantId
+            // Clientes: nombre de usuario único por tienda (mismo criterio que TenantUserService).
+            UserName = role == Roles.Customer ? $"c.{tenantId:N}.{email}" : email,
+            Email = email, EmailConfirmed = true, FullName = fullName, TenantId = tenantId, PhoneNumber = phone
         };
         var result = await users.CreateAsync(user, DemoPassword);
         if (!result.Succeeded)
             throw new InvalidOperationException(string.Join("; ", result.Errors.Select(e => e.Description)));
         await users.AddToRoleAsync(user, role);
+        return user;
     }
 }
 
