@@ -41,6 +41,23 @@ public sealed class StorePagesTests : StoreTestContext
         cut.Markup.Should().Contain(category.DisplayName());
     }
 
+    [Theory]
+    [InlineData("hombre", null, "Hombre", "50 productos")]
+    [InlineData("mujer", null, "Mujer", "50 productos")]
+    [InlineData("ninos", null, "Niños", "25 productos")]
+    [InlineData("ninos", "calzados", "Niños · Calzados", "5 productos")]
+    [InlineData("hombre", "relojes", "Hombre · Relojes", "10 productos")]
+    public async Task Section_routes_filter_100_products(string section, string? category, string title, string count)
+    {
+        await SeedProductsAsync();
+
+        var cut = Render<CatalogPage>(p => p.AddCascadingValue(HostContext)
+            .Add(x => x.AudienceSlug, section).Add(x => x.CategorySlug, category));
+
+        cut.WaitForAssertion(() => cut.Markup.Should().Contain(count));
+        cut.Find("[data-testid='catalog-title']").TextContent.Should().Be(title);
+    }
+
     [Fact]
     public async Task Product_page_shows_variants_and_attributes_of_a_perfume()
     {

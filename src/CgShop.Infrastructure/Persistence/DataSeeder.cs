@@ -44,6 +44,7 @@ public sealed class DataSeeder(
         {
             await BackfillDemoContactAsync(ct);
             await BackfillDemoCustomersAsync(ct);
+            await BackfillDemoAudiencesAsync(ct);
             return;
         }
 
@@ -128,6 +129,29 @@ public sealed class DataSeeder(
         }
 
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Asigna Hombre/Mujer/Niños a los productos demo creados antes de existir las secciones
+    /// y agrega los productos infantiles que falten. Solo toca productos que siguen como Unisex.
+    /// </summary>
+    private async Task BackfillDemoAudiencesAsync(CancellationToken ct)
+    {
+        foreach (var tenant in await db.Tenants.Where(t => t.Slug == "verde" || t.Slug == "rojo").ToListAsync(ct))
+        {
+            await using var scope = scopeFactory.CreateAsyncScope();
+            scope.ServiceProvider.GetRequiredService<TenantContext>().SetTenant(TenantInfo.From(tenant));
+            var tenantDb = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var existing = await tenantDb.Products.ToListAsync(ct);
+            foreach (var product in existing.Where(p => p.Audience == ProductAudience.Unisex))
+                product.SetAudience(DemoCatalog.AudienceFor(product.Name));
+
+            var slugs = existing.Select(p => p.Slug).ToHashSet();
+            tenantDb.Products.AddRange(DemoCatalog.Build(tenant.Slug)
+                .Where(p => p.Audience == ProductAudience.Kids && !slugs.Contains(p.Slug)));
+            await tenantDb.SaveChangesAsync(ct);
+        }
     }
 
     public static string CustomerEmail(string slug) => $"cliente@{slug}.local";
@@ -229,6 +253,32 @@ internal static class DemoCatalog
         foreach (var size in new[] { "40", "41", "42", "43" })
             botas.AddVariant($"{p}-CHL-MR-{size}", 9800, 2, size, "Marrón");
 
-        return [polo, jeans, gorra, gorraTrucker, reloj, relojAuto, perfume, perfume2, tenis, botas];
+        var camisetaNinos = Product.Create("Camiseta Infantil Dinosaurio", ProductCategory.Clothing, "Carter's",
+            "Algodón suave para el día a día.", null, new Dictionary<string, string> { ["Material"] = "100% algodón" });
+        foreach (var size in new[] { "4", "6", "8", "10" })
+        {
+            camisetaNinos.AddVariant($"{p}-DINO-AZ-{size}", 950, 6, size, "Azul");
+            camisetaNinos.AddVariant($"{p}-DINO-VD-{size}", 950, 6, size, "Verde");
+        }
+
+        var tenisNinos = Product.Create("Tenis Infantiles Revolution", ProductCategory.Footwear, "Nike",
+            "Ligeros y con cierre de velcro.", null);
+        foreach (var size in new[] { "28", "29", "30", "31", "32", "33" })
+            tenisNinos.AddVariant($"{p}-REVK-RS-{size}", 3900, 3, size, "Rosado");
+
+        Product[] products = [polo, jeans, gorra, gorraTrucker, reloj, relojAuto, perfume, perfume2, tenis, botas,
+            camisetaNinos, tenisNinos];
+        foreach (var product in products)
+            product.SetAudience(AudienceFor(product.Name));
+        return products;
     }
+
+    /// <summary>Público de cada producto demo; lo no listado es Unisex.</summary>
+    public static ProductAudience AudienceFor(string name) => name switch
+    {
+        "Polo Clásico Algodón" or "Reloj Presage Automático" or "Sauvage Eau de Parfum" => ProductAudience.Men,
+        "Coco Mademoiselle" or "Botas Chelsea Cuero" => ProductAudience.Women,
+        "Camiseta Infantil Dinosaurio" or "Tenis Infantiles Revolution" => ProductAudience.Kids,
+        _ => ProductAudience.Unisex
+    };
 }

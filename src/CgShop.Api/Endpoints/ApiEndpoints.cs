@@ -61,9 +61,9 @@ public static class StoreEndpoints
         var store = app.MapGroup("/api/store").WithTags("Tienda").AddEndpointFilter(RequireTenant);
 
         store.MapGet("/catalog", (CatalogService catalog, ProductCategory? category, string? search, string? size,
-                string? color, CatalogSort? sort, int? page, int? pageSize, CancellationToken ct) =>
+                string? color, CatalogSort? sort, int? page, int? pageSize, ProductAudience? audience, CancellationToken ct) =>
             catalog.SearchAsync(new CatalogQuery(category, search, size, color, Sort: sort ?? CatalogSort.Newest,
-                Page: page ?? 1, PageSize: pageSize ?? 24), ct));
+                Page: page ?? 1, PageSize: pageSize ?? 24, Audience: audience), ct));
 
         store.MapGet("/catalog/{slug}", async (string slug, CatalogService catalog, CancellationToken ct) =>
             await catalog.GetBySlugAsync(slug, ct) is { } product ? Results.Ok(product) : Results.NotFound());

@@ -69,6 +69,19 @@ public static class Ui
     public static ProductCategory? CategoryFromSlug(string? slug) =>
         Enum.GetValues<ProductCategory>().Cast<ProductCategory?>().FirstOrDefault(c => CategorySlug(c!.Value) == slug);
 
+    /// <summary>Secciones de navegación de la tienda (Unisex no es sección: aparece dentro de Hombre y Mujer).</summary>
+    public static readonly ProductAudience[] Sections = [ProductAudience.Women, ProductAudience.Men, ProductAudience.Kids];
+
+    /// <summary>URL del catálogo: /catalogo, /catalogo/{categoria}, /seccion/{publico} o /seccion/{publico}/{categoria}.</summary>
+    public static string CatalogUrl(ProductAudience? audience, ProductCategory? category) =>
+        (audience, category) switch
+        {
+            (null, null) => "/catalogo",
+            (null, { } c) => $"/catalogo/{CategorySlug(c)}",
+            ({ } a, null) => $"/seccion/{a.Slug()}",
+            ({ } a, { } c) => $"/seccion/{a.Slug()}/{CategorySlug(c)}"
+        };
+
     /// <summary>Ejecuta una acción mostrando los errores de negocio como Snackbar. Devuelve true si tuvo éxito.</summary>
     public static async Task<bool> TryAsync(this ISnackbar snackbar, Func<Task> action, string? successMessage = null)
     {

@@ -15,6 +15,11 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
 
         if (query.Category is { } category)
             products = products.Where(p => p.Category == category);
+        if (query.Audience is { } audience)
+        {
+            var audiences = audience.Includes();
+            products = products.Where(p => audiences.Contains(p.Audience));
+        }
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
             var term = query.Search.Trim();
@@ -90,12 +95,18 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
             ImageUrl(v.Product.MainImage?.Id, v.Product.ImageUrl), v.Product.IsActive)).ToList();
     }
 
-    public async Task<CatalogFacetsDto> GetFacetsAsync(ProductCategory? category = null, CancellationToken ct = default)
+    public async Task<CatalogFacetsDto> GetFacetsAsync(ProductCategory? category = null,
+        ProductAudience? audience = null, CancellationToken ct = default)
     {
         await using var db = dbFactory.CreateDbContext();
         var variants = db.ProductVariants.AsNoTracking().Where(v => v.Product!.IsActive);
         if (category is { } c)
             variants = variants.Where(v => v.Product!.Category == c);
+        if (audience is { } a)
+        {
+            var audiences = a.Includes();
+            variants = variants.Where(v => audiences.Contains(v.Product!.Audience));
+        }
 
         var categories = await db.Products.AsNoTracking().Where(p => p.IsActive)
             .Select(p => p.Category).Distinct().ToListAsync(ct);
@@ -124,7 +135,7 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         new(p.Id, p.Slug, p.Name, p.Brand, p.Description, p.Category, ImageUrl(p.MainImage?.Id, p.ImageUrl),
             p.Attributes,
             p.Variants.OrderBy(v => v.VolumeMl).ThenBy(v => v.Size).ThenBy(v => v.Color).Select(ToDto).ToList(),
-            p.Images.Select(ProductImageService.ToDto).ToList());
+            p.Images.Select(ProductImageService.ToDto).ToList(), p.Audience);
 
     /// <summary>Foto principal subida; si no hay, la URL externa opcional del producto.</summary>
     private static string? ImageUrl(Guid? mainImageId, string? externalUrl) =>

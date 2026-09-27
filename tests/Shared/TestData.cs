@@ -54,7 +54,8 @@ public static class TestData
         };
 
         var product = Domain.Catalog.Product.Create($"{category.DisplayName()} Modelo {i:000}", category,
-            Brands[i % Brands.Length], $"Descripción del producto {i}", null, attributes);
+            Brands[i % Brands.Length], $"Descripción del producto {i}", null, attributes,
+            AudienceFor(i));
         product.TenantId = tenantId;
 
         var variants = 1 + i % 3;
@@ -76,6 +77,9 @@ public static class TestData
 
         return product;
     }
+
+    /// <summary>Público del producto i: cada categoría (20 productos) queda con 5 de cada público.</summary>
+    public static ProductAudience AudienceFor(int i) => (ProductAudience)(i / 5 % 4);
 
     public static IEnumerable<Product> Products(int count = BatchSize, Guid tenantId = default, int stockPerVariant = 50) =>
         Enumerable.Range(1, count).Select(i => Product(i, tenantId, stockPerVariant));

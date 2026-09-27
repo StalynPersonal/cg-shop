@@ -106,6 +106,67 @@ public class CatalogServiceTests : IAsyncLifetime
         facets.Colors.Should().Contain(["Negro", "Blanco"]);
     }
 
+    [Theory]
+    [InlineData(ProductAudience.Men, 50)]    // 25 de hombre + 25 unisex
+    [InlineData(ProductAudience.Women, 50)]  // 25 de mujer + 25 unisex
+    [InlineData(ProductAudience.Kids, 25)]   // niños es exclusivo
+    [InlineData(ProductAudience.Unisex, 25)]
+    public async Task Filters_100_products_by_section(ProductAudience audience, int expected)
+    {
+        var service = new CatalogService(_factory);
+        var allowed = audience.Includes();
+
+        var result = await service.SearchAsync(new CatalogQuery(Audience: audience, PageSize: 200));
+        result.TotalCount.Should().Be(expected);
+
+        foreach (var card in result.Items)
+            allowed.Should().Contain((await service.GetBySlugAsync(card.Slug))!.Audience);
+
+        // Sección + categoría: cada categoría tiene 5 productos de cada público.
+        var footwear = await service.SearchAsync(new CatalogQuery(ProductCategory.Footwear, Audience: audience, PageSize: 200));
+        footwear.TotalCount.Should().Be(expected / 5);
+
+        var facets = await service.GetFacetsAsync(ProductCategory.Footwear, audience);
+        facets.Sizes.Should().NotBeEmpty().And.OnlyContain(s => s.All(char.IsDigit));
+    }
+
+    [Fact]
+    public async Task Admin_sets_and_changes_the_section_of_a_product()
+    {
+        var admin = new ProductAdminService(_factory, _factory.Context, NSubstitute.Substitute.For<IFileStorage>(),
+            TimeProvider.System, NullLogger<ProductAdminService>.Instance);
+        var catalog = new CatalogService(_factory);
+
+        var id = await admin.CreateAsync(
+            new ProductUpsertDto { Name = "Vestido Floral", Category = ProductCategory.Clothing, Audience = ProductAudience.Women },
+            [new VariantUpsertDto { Sku = "VEST-FL-M", Size = "M", Color = "Rojo", Price = 2500, InitialStock = 3 }],
+            TestData.TenantStaff);
+
+        (await admin.GetForEditAsync(id)).Product.Audience.Should().Be(ProductAudience.Women);
+        (await catalog.SearchAsync(new CatalogQuery(Audience: ProductAudience.Women, PageSize: 200))).TotalCount.Should().Be(51);
+
+        var (dto, _) = await admin.GetForEditAsync(id);
+        dto.Audience = ProductAudience.Kids;
+        await admin.UpdateAsync(id, dto, TestData.TenantStaff);
+
+        (await catalog.GetByIdAsync(id))!.Audience.Should().Be(ProductAudience.Kids);
+        (await catalog.SearchAsync(new CatalogQuery(Audience: ProductAudience.Women, PageSize: 200))).TotalCount.Should().Be(50);
+    }
+
+    [Fact]
+    public void Section_slugs_round_trip_and_invalid_audience_is_rejected()
+    {
+        foreach (var audience in Enum.GetValues<ProductAudience>())
+            ProductAudienceExtensions.FromSlug(audience.Slug()).Should().Be(audience);
+        ProductAudienceExtensions.FromSlug("NINOS").Should().Be(ProductAudience.Kids);
+        ProductAudienceExtensions.FromSlug("mascotas").Should().BeNull();
+        ProductAudience.Kids.DisplayName().Should().Be("Niños");
+
+        var product = Product.Create("Gorra", ProductCategory.Caps);
+        product.Audience.Should().Be(ProductAudience.Unisex);
+        product.Invoking(p => p.SetAudience((ProductAudience)9)).Should().Throw<DomainException>();
+    }
+
     [Fact]
     public void Sizes_are_sorted_numerically_then_by_clothing_order()
     {

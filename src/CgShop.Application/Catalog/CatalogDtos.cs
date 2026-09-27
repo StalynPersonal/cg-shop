@@ -12,7 +12,8 @@ public sealed record CatalogQuery(
     bool InStockOnly = false,
     CatalogSort Sort = CatalogSort.Newest,
     int Page = 1,
-    int PageSize = 24);
+    int PageSize = 24,
+    ProductAudience? Audience = null);
 
 public enum CatalogSort
 {
@@ -60,7 +61,8 @@ public sealed record ProductDetailDto(
     string? ImageUrl,
     IReadOnlyDictionary<string, string> Attributes,
     IReadOnlyList<VariantDto> Variants,
-    IReadOnlyList<ProductImageDto> Images);
+    IReadOnlyList<ProductImageDto> Images,
+    ProductAudience Audience = ProductAudience.Unisex);
 
 public sealed record CatalogFacetsDto(
     IReadOnlyList<ProductCategory> Categories,
@@ -82,6 +84,7 @@ public sealed class ProductUpsertDto
 {
     public string Name { get; set; } = "";
     public ProductCategory Category { get; set; } = ProductCategory.Clothing;
+    public ProductAudience Audience { get; set; } = ProductAudience.Unisex;
     public string? Brand { get; set; }
     public string? Description { get; set; }
     public string? ImageUrl { get; set; }

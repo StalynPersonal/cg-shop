@@ -239,3 +239,20 @@ html, body {
 .mud-chip.cg-variant-chip.mud-disabled {
     text-decoration: line-through;
 }
+
+/* Barra de secciones de la tienda (debajo de la cabecera, solo escritorio). */
+.cg-subnav {
+    background: var(--mud-palette-surface);
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.cg-subnav .mud-button-root {
+    text-transform: none;
+    font-weight: 500;
+}
+
+.cg-subnav .cg-subnav-section .mud-button-root {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+}

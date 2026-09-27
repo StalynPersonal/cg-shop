@@ -61,7 +61,7 @@ public sealed class ProductAdminService(
                 ?? throw new NotFoundException("Producto no encontrado.");
         return (new ProductUpsertDto
         {
-            Name = p.Name, Category = p.Category, Brand = p.Brand, Description = p.Description,
+            Name = p.Name, Category = p.Category, Audience = p.Audience, Brand = p.Brand, Description = p.Description,
             ImageUrl = p.ImageUrl, Attributes = new Dictionary<string, string>(p.Attributes)
         }, p.Variants.OrderBy(v => v.Sku).Select(CatalogService.ToDto).ToList());
     }
@@ -73,7 +73,8 @@ public sealed class ProductAdminService(
         var tenantInfo = Guard.RequireTenant(tenant);
         await using var db = dbFactory.CreateDbContext();
 
-        var product = Product.Create(dto.Name, dto.Category, dto.Brand, dto.Description, dto.ImageUrl, dto.Attributes);
+        var product = Product.Create(dto.Name, dto.Category, dto.Brand, dto.Description, dto.ImageUrl, dto.Attributes,
+            dto.Audience);
         product.TenantId = tenantInfo.Id;
         foreach (var v in variants)
             product.AddVariant(v.Sku, v.Price, v.InitialStock, v.Size, v.Color, v.VolumeMl).TenantId = tenantInfo.Id;
@@ -94,6 +95,7 @@ public sealed class ProductAdminService(
         await using var db = dbFactory.CreateDbContext();
         var product = await LoadAsync(db, productId, ct);
         product.Update(dto.Name, dto.Brand, dto.Description, dto.ImageUrl, dto.Attributes);
+        product.SetAudience(dto.Audience);
         await EnsureUniqueSlugAsync(db, product, ct);
         await db.SaveChangesAsync(ct);
     }

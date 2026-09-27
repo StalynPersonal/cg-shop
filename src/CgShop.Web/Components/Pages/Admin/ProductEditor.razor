@@ -28,6 +28,13 @@ else
                                 <MudSelectItem Value="c">@c.DisplayName()</MudSelectItem>
                             }
                         </MudSelect>
+                        <MudSelect T="ProductAudience" @bind-Value="_product.Audience" Label="Para" Variant="Variant.Outlined"
+                                   HelperText="Sección de la tienda: lo Unisex aparece en Hombre y en Mujer" data-testid="product-audience">
+                            @foreach (var a in Enum.GetValues<ProductAudience>())
+                            {
+                                <MudSelectItem Value="a">@a.DisplayName()</MudSelectItem>
+                            }
+                        </MudSelect>
                         <MudTextField @bind-Value="_product.Brand" Label="Marca" Variant="Variant.Outlined" MaxLength="100" />
                         <MudTextField @bind-Value="_product.Description" Label="Descripción" Lines="4" Variant="Variant.Outlined" MaxLength="4000" />
                         <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen externa" HelperText="Opcional: solo si no sube fotos más abajo" Variant="Variant.Outlined" />

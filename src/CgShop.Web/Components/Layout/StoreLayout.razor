@@ -25,17 +25,6 @@
             }
             <MudText Typo="Typo.h6" Class="cg-appbar-title" data-testid="store-name">@Host.Tenant?.Name</MudText>
         </MudLink>
-        <MudHidden Breakpoint="Breakpoint.MdAndDown">
-            <MudStack Row="true" Class="ml-6" Spacing="0">
-                <MudButton Href="/catalogo" Color="Color.Inherit">Todo</MudButton>
-                @foreach (var category in Enum.GetValues<ProductCategory>())
-                {
-                    <MudButton Href="@($"/catalogo/{Ui.CategorySlug(category)}")" Color="Color.Inherit">
-                        @category.DisplayName()
-                    </MudButton>
-                }
-            </MudStack>
-        </MudHidden>
         <MudSpacer />
         @* Escritorio: botones con texto. Celular: solo íconos (el resto está en el menú ☰). *@
         <MudHidden Breakpoint="Breakpoint.Xs">
@@ -86,6 +75,19 @@
         <MudNavMenu Color="Color.Primary">
             <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" OnClick="Close">Inicio</MudNavLink>
             <MudNavLink Href="/catalogo" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.GridView" OnClick="Close">Todo el catálogo</MudNavLink>
+            @foreach (var section in Ui.Sections)
+            {
+                <MudNavGroup Title="@section.DisplayName()" Icon="@SectionIcon(section)" data-testid="drawer-section">
+                    <MudNavLink Href="@Ui.CatalogUrl(section, null)" Match="NavLinkMatch.All" OnClick="Close">
+                        Ver todo @section.DisplayName()
+                    </MudNavLink>
+                    @foreach (var category in Enum.GetValues<ProductCategory>())
+                    {
+                        <MudNavLink Href="@Ui.CatalogUrl(section, category)" OnClick="Close">@category.DisplayName()</MudNavLink>
+                    }
+                </MudNavGroup>
+            }
+            <MudDivider Class="my-2" />
             @foreach (var category in Enum.GetValues<ProductCategory>())
             {
                 <MudNavLink Href="@($"/catalogo/{Ui.CategorySlug(category)}")" Icon="@Ui.CategoryIcon(category)" OnClick="Close">
@@ -117,6 +119,37 @@
     </MudDrawer>
 
     <MudMainContent Class="cg-sticky-footer-layout">
+        @* Escritorio: barra de secciones (Mujer, Hombre, Niños con sus categorías) y categorías directas. *@
+        <MudHidden Breakpoint="Breakpoint.MdAndDown">
+            <nav class="cg-subnav" data-testid="store-subnav">
+                <MudContainer MaxWidth="MaxWidth.Large" Class="d-flex align-center flex-wrap">
+                    @foreach (var section in Ui.Sections)
+                    {
+                        <MudMenu Label="@section.DisplayName()" EndIcon="@Icons.Material.Filled.KeyboardArrowDown"
+                                 Variant="Variant.Text" Color="Color.Default" Class="cg-subnav-section"
+                                 AnchorOrigin="Origin.BottomLeft" TransformOrigin="Origin.TopLeft" data-testid="nav-section">
+                            <MudMenuItem Href="@Ui.CatalogUrl(section, null)">
+                                <b>Ver todo @section.DisplayName()</b>
+                            </MudMenuItem>
+                            @foreach (var category in Enum.GetValues<ProductCategory>())
+                            {
+                                <MudMenuItem Href="@Ui.CatalogUrl(section, category)" Icon="@Ui.CategoryIcon(category)">
+                                    @category.DisplayName()
+                                </MudMenuItem>
+                            }
+                        </MudMenu>
+                    }
+                    <MudDivider Vertical="true" FlexItem="true" Class="mx-2 my-2" />
+                    @foreach (var category in Enum.GetValues<ProductCategory>())
+                    {
+                        <MudButton Href="@Ui.CatalogUrl(null, category)" Color="Color.Default" Variant="Variant.Text">
+                            @category.DisplayName()
+                        </MudButton>
+                    }
+                    <MudButton Href="/catalogo" Color="Color.Default" Variant="Variant.Text">Todo</MudButton>
+                </MudContainer>
+            </nav>
+        </MudHidden>
         <MudContainer MaxWidth="MaxWidth.Large" Class="py-6 cg-main-grow">
             @Body
         </MudContainer>
@@ -136,6 +169,13 @@
         user.IsInRole(Roles.TenantAdmin) || user.IsInRole(Roles.TenantStaff);
 
     private void Close() => _menuOpen = false;
+
+    private static string SectionIcon(ProductAudience section) => section switch
+    {
+        ProductAudience.Women => Icons.Material.Filled.Woman,
+        ProductAudience.Men => Icons.Material.Filled.Man,
+        _ => Icons.Material.Filled.ChildCare
+    };
 
     protected override void OnInitialized() => Cart.Changed += OnCartChanged;
 

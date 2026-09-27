@@ -1,13 +1,15 @@
 @page "/catalogo"
 @page "/catalogo/{CategorySlug}"
+@page "/seccion/{AudienceSlug}"
+@page "/seccion/{AudienceSlug}/{CategorySlug}"
 @attribute [TenantHost]
 @inject CatalogService Catalog
 @inject NavigationManager Navigation
 
-<PageTitle>@(_category?.DisplayName() ?? "Catálogo") · @Host.Tenant?.Name</PageTitle>
+<PageTitle>@(Title ?? "Catálogo") · @Host.Tenant?.Name</PageTitle>
 
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
-    <MudText Typo="Typo.h4">@(_category?.DisplayName() ?? "Todo el catálogo")</MudText>
+    <MudText Typo="Typo.h4" data-testid="catalog-title">@(Title ?? "Todo el catálogo")</MudText>
     @* En celular los filtros se pliegan para que los productos se vean primero. *@
     <MudHidden Breakpoint="Breakpoint.MdAndUp">
         <MudButton Variant="Variant.Outlined" Color="Color.Primary" Size="Size.Small"
@@ -26,6 +28,14 @@
                               AdornmentIcon="@Icons.Material.Filled.Search" Immediate="false"
                               OnBlur="ReloadAsync" OnKeyUp="OnSearchKeyUp" Clearable="true"
                               OnClearButtonClick="ReloadAsync" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                <MudSelect T="string" Label="Para" Value="@(_audience?.Slug() ?? "")" ValueChanged="ChangeAudience"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" data-testid="audience-filter">
+                    <MudSelectItem Value="@("")">Todos</MudSelectItem>
+                    @foreach (var a in Ui.Sections)
+                    {
+                        <MudSelectItem Value="@a.Slug()">@a.DisplayName()</MudSelectItem>
+                    }
+                </MudSelect>
                 <MudSelect T="string" Label="Categoría" Value="@(CategorySlug ?? "")" ValueChanged="ChangeCategory"
                            Variant="Variant.Outlined" Margin="Margin.Dense">
                     <MudSelectItem Value="@("")">Todas</MudSelectItem>
@@ -92,8 +102,10 @@
 @code {
     [CascadingParameter] private HostContext Host { get; set; } = default!;
     [Parameter] public string? CategorySlug { get; set; }
+    [Parameter] public string? AudienceSlug { get; set; }
 
     private ProductCategory? _category;
+    private ProductAudience? _audience;
     private CatalogFacetsDto? _facets;
     private PagedResult<ProductCardDto>? _result;
     private string? _search;
@@ -107,15 +119,16 @@
     protected override async Task OnParametersSetAsync()
     {
         _category = Ui.CategoryFromSlug(CategorySlug);
+        _audience = ProductAudienceExtensions.FromSlug(AudienceSlug);
         _size = _color = null;
         _page = 1;
-        _facets = await Catalog.GetFacetsAsync(_category);
+        _facets = await Catalog.GetFacetsAsync(_category, _audience);
         await LoadAsync();
     }
 
     private async Task LoadAsync() =>
         _result = await Catalog.SearchAsync(new CatalogQuery(_category, _search, _size, _color, InStockOnly: _inStock,
-            Sort: _sort, Page: _page, PageSize: 12));
+            Sort: _sort, Page: _page, PageSize: 12, Audience: _audience));
 
     private async Task ReloadAsync()
     {
@@ -135,6 +148,18 @@
         await LoadAsync();
     }
 
+    /// <summary>"Hombre · Calzados", "Mujer", "Relojes"...</summary>
+    private string? Title => (_audience, _category) switch
+    {
+        (null, null) => null,
+        ({ } a, null) => a.DisplayName(),
+        (null, { } c) => c.DisplayName(),
+        ({ } a, { } c) => $"{a.DisplayName()} · {c.DisplayName()}"
+    };
+
     private void ChangeCategory(string slug) =>
-        Navigation.NavigateTo(string.IsNullOrEmpty(slug) ? "/catalogo" : $"/catalogo/{slug}");
+        Navigation.NavigateTo(Ui.CatalogUrl(_audience, Ui.CategoryFromSlug(slug)));
+
+    private void ChangeAudience(string slug) =>
+        Navigation.NavigateTo(Ui.CatalogUrl(ProductAudienceExtensions.FromSlug(slug), _category));
 }

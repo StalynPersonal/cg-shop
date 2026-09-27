@@ -22,8 +22,11 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(p => p.Description).HasMaxLength(4000);
         b.Property(p => p.ImageUrl).HasMaxLength(500);
         b.Property(p => p.Category).HasConversion<string>().HasMaxLength(20);
+        b.Property(p => p.Audience).HasConversion<string>().HasMaxLength(10)
+            .HasDefaultValue(ProductAudience.Unisex); // filas existentes quedan como Unisex
         b.HasIndex(p => new { p.TenantId, p.Slug }).IsUnique();
         b.HasIndex(p => new { p.TenantId, p.Category, p.IsActive });
+        b.HasIndex(p => new { p.TenantId, p.Audience, p.IsActive });
 
         // Atributos específicos por categoría (notas olfativas, material...) como JSON.
         b.Property(p => p.Attributes)

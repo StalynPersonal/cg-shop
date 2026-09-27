@@ -18,6 +18,9 @@ public sealed class Product : Entity, ITenantEntity
     public string? ImageUrl { get; private set; }
     public bool IsActive { get; private set; } = true;
 
+    /// <summary>Hombre, Mujer, Niños o Unisex (para las secciones de la tienda).</summary>
+    public ProductAudience Audience { get; private set; } = ProductAudience.Unisex;
+
     /// <summary>
     /// Atributos específicos de la categoría (notas olfativas, material, tipo de movimiento...).
     /// Se persiste como columna JSON.
@@ -101,11 +104,20 @@ public sealed class Product : Entity, ITenantEntity
     public int TotalAvailable => _variants.Sum(v => v.Available);
 
     public static Product Create(string name, ProductCategory category, string? brand = null,
-        string? description = null, string? imageUrl = null, IDictionary<string, string>? attributes = null)
+        string? description = null, string? imageUrl = null, IDictionary<string, string>? attributes = null,
+        ProductAudience audience = ProductAudience.Unisex)
     {
         var product = new Product { Category = category };
         product.Update(name, brand, description, imageUrl, attributes);
+        product.SetAudience(audience);
         return product;
+    }
+
+    public void SetAudience(ProductAudience audience)
+    {
+        if (!Enum.IsDefined(audience))
+            throw new DomainException("Público inválido.");
+        Audience = audience;
     }
 
     public void Update(string name, string? brand, string? description, string? imageUrl,
