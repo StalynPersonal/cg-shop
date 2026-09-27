@@ -60,7 +60,7 @@ public sealed class CheckoutService(
                 var qty = requested[variant.Id];
                 variant.Reserve(qty); // DomainException si no hay stock suficiente
                 lines.Add(new OrderLine(variant.Id, variant.Sku, variant.Product.Name, variant.Description,
-                    variant.Price, qty));
+                    variant.Price, qty, variant.ProductId));
             }
 
             var ttl = TimeSpan.FromHours(options.Value.ReservationHours);

@@ -106,9 +106,8 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
 
         var ranking = await db.OrderItems
             .Where(i => db.Orders.Any(o => o.Id == i.OrderId && SoldStatuses.Contains(o.Status) && o.CreatedAtUtc >= since))
-            .Join(db.ProductVariants, i => i.VariantId, v => v.Id, (i, v) => new { v.ProductId, i.Quantity })
-            .GroupBy(x => x.ProductId)
-            .Select(g => new { ProductId = g.Key, Units = g.Sum(x => x.Quantity) })
+            .GroupBy(i => i.ProductId) // copia en la línea: cuenta aunque la variante ya no exista
+            .Select(g => new { ProductId = g.Key, Units = g.Sum(i => i.Quantity) })
             .OrderByDescending(x => x.Units)
             .Take(take * 2) // margen por si alguno está inactivo
             .ToListAsync(ct);

@@ -56,7 +56,10 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
         b.Property(i => i.VariantDescription).HasMaxLength(200);
         b.Property(i => i.UnitPrice).HasPrecision(18, 2);
         b.Ignore(i => i.LineTotal);
-        b.HasOne<ProductVariant>().WithMany().HasForeignKey(i => i.VariantId).OnDelete(DeleteBehavior.Restrict);
+        // Sin FK a la variante: la línea guarda su propia copia (SKU, nombre, variante, precio, producto)
+        // y el pedido se conserva aunque la variante se elimine.
+        b.HasIndex(i => i.VariantId);
+        b.HasIndex(i => i.ProductId);
     }
 }
 
@@ -97,6 +100,8 @@ internal sealed class StockReservationConfiguration : IEntityTypeConfiguration<S
         b.HasIndex(r => new { r.Status, r.ExpiresAtUtc });
         b.HasIndex(r => r.OrderId);
         b.HasOne<Order>().WithMany().HasForeignKey(r => r.OrderId).OnDelete(DeleteBehavior.Cascade);
-        b.HasOne<ProductVariant>().WithMany().HasForeignKey(r => r.VariantId).OnDelete(DeleteBehavior.Restrict);
+        // Sin FK a la variante: las reservas activas se validan en la aplicación (bloquean eliminar la variante);
+        // las ya confirmadas o liberadas no deben impedir que se elimine.
+        b.HasIndex(r => r.VariantId);
     }
 }

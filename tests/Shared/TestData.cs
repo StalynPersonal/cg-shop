@@ -88,7 +88,7 @@ public static class TestData
         new($"Cliente {i:000}", $"cliente{i}@correo.com", $"809-555-{i:0000}", $"Calle {i}, Santo Domingo");
 
     public static OrderLine LineFor(ProductVariant variant, Product product, int quantity) =>
-        new(variant.Id, variant.Sku, product.Name, variant.Description, variant.Price, quantity);
+        new(variant.Id, variant.Sku, product.Name, variant.Description, variant.Price, quantity, product.Id);
 
     /// <summary>Orden pendiente de validación con 1-3 líneas.</summary>
     public static Order Order(int i, Guid tenantId = default, TimeSpan? ttl = null)

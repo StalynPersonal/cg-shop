@@ -2,8 +2,9 @@ using CgShop.Domain.Common;
 
 namespace CgShop.Domain.Orders;
 
+/// <summary>Línea a facturar: copia los datos del producto/variante al momento de la compra.</summary>
 public sealed record OrderLine(Guid VariantId, string Sku, string ProductName, string VariantDescription,
-    decimal UnitPrice, int Quantity);
+    decimal UnitPrice, int Quantity, Guid ProductId = default);
 
 /// <param name="ShippingAddress">Obligatoria para <see cref="DeliveryMethod.Shipping"/>; se ignora en retiro.</param>
 public sealed record CustomerInfo(string FullName, string Email, string Phone, string? ShippingAddress,
@@ -101,7 +102,7 @@ public sealed class Order : Entity, ITenantEntity
         {
             var first = group.First();
             order._items.Add(new OrderItem(order.Id, first.VariantId, first.Sku, first.ProductName,
-                first.VariantDescription, first.UnitPrice, group.Sum(l => l.Quantity)));
+                first.VariantDescription, first.UnitPrice, group.Sum(l => l.Quantity), first.ProductId));
         }
 
         order.Subtotal = order._items.Sum(i => i.LineTotal);

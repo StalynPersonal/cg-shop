@@ -396,4 +396,56 @@ public sealed class OrderFlowTests(SqlServerFixture fx)
         await scope.ServiceProvider.GetRequiredService<CheckoutService>()
             .Invoking(c => c.PlaceOrderAsync(request)).Should().ThrowAsync<DomainException>().WithMessage("*método de pago*");
     }
+
+    [Fact]
+    public async Task Orders_keep_their_own_copy_when_the_sold_variants_are_deleted()
+    {
+        var (tenant, variantIds) = await TenantWithStockAsync(products: 10);
+        await using var scope = fx.TenantScope(tenant);
+        var checkout = scope.ServiceProvider.GetRequiredService<CheckoutService>();
+        var admin = scope.ServiceProvider.GetRequiredService<OrderAdminService>();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var results = new List<PlaceOrderResult>();
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var result = await checkout.PlaceOrderAsync(Request(i, variantIds, qty: 1));
+            await admin.ValidatePaymentAsync(result.OrderId, TestData.TenantAdmin, null);
+            results.Add(result);
+        }
+
+        var before = new Dictionary<Guid, OrderItemDto>();
+        foreach (var r in results)
+            before[r.OrderId] = (await admin.GetAsync(r.OrderId)).Items.Single();
+
+        // Se eliminan las variantes de la mitad de los productos (antes la FK lo impedía).
+        var products = await db.Products.Include(p => p.Variants).OrderBy(p => p.Name).ToListAsync();
+        var removedProducts = products.Take(5).ToList();
+        var removedVariants = removedProducts.SelectMany(p => p.Variants).Select(v => v.Id).ToHashSet();
+        db.ProductVariants.RemoveRange(removedProducts.SelectMany(p => p.Variants));
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+
+        var affected = 0;
+        foreach (var r in results)
+        {
+            var item = (await admin.GetAsync(r.OrderId)).Items.Single();
+            item.Should().BeEquivalentTo(before[r.OrderId], "el pedido conserva SKU, nombre, variante y precio");
+            var line = await db.OrderItems.AsNoTracking().SingleAsync(i => i.OrderId == r.OrderId);
+            line.ProductId.Should().NotBeEmpty();
+            if (removedVariants.Contains(line.VariantId))
+                affected++;
+        }
+        affected.Should().BeGreaterThan(0);
+
+        // Cancelar un pedido pagado cuya variante ya no existe no falla (no hay a dónde devolver stock).
+        var orphan = results.First(r => removedVariants.Contains(
+            db.OrderItems.AsNoTracking().Single(i => i.OrderId == r.OrderId).VariantId));
+        await admin.CancelAsync(orphan.OrderId, TestData.TenantAdmin, "Cliente desistió");
+        (await admin.GetAsync(orphan.OrderId)).Status.Should().Be(OrderStatus.Cancelled);
+
+        // Las tendencias siguen contando las ventas de productos cuyas variantes se eliminaron.
+        var soldProducts = await db.OrderItems.Select(i => i.ProductId).Distinct().ToListAsync();
+        soldProducts.Should().Contain(removedProducts.Select(p => p.Id));
+    }
 }

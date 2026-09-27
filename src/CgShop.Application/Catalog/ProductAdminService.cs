@@ -117,7 +117,7 @@ public sealed class ProductAdminService(
         await using var db = dbFactory.CreateDbContext();
         var product = await LoadAsync(db, productId, ct);
         var variantIds = product.Variants.Select(v => v.Id).ToList();
-        var hasSales = await db.OrderItems.AnyAsync(i => variantIds.Contains(i.VariantId), ct);
+        var hasSales = await db.OrderItems.AnyAsync(i => i.ProductId == productId || variantIds.Contains(i.VariantId), ct);
         if (hasSales)
         {
             product.Deactivate();
