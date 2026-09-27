@@ -1,5 +1,6 @@
 using CgShop.Application.Common;
 using CgShop.Domain.Catalog;
+using CgShop.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
 
 namespace CgShop.Application.Catalog;
@@ -83,6 +84,60 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
             ImageUrl(p.MainImageId, p.ImageUrl), p.MinPrice, p.Available)).ToList();
 
         return new PagedResult<ProductCardDto>(items, total, page, pageSize);
+    }
+
+    /// <summary>Estados en los que un pedido cuenta como venta (pago validado en adelante).</summary>
+    private static readonly OrderStatus[] SoldStatuses =
+    [
+        OrderStatus.PaymentValidated, OrderStatus.Preparing, OrderStatus.Shipped, OrderStatus.ReadyForPickup,
+        OrderStatus.Delivered
+    ];
+
+    /// <summary>
+    /// Productos en tendencia: los más vendidos (unidades) en los últimos <paramref name="days"/> días.
+    /// Si hay pocas ventas, se completa con las novedades para que la sección no quede vacía.
+    /// </summary>
+    public async Task<IReadOnlyList<ProductCardDto>> GetTrendingAsync(DateTime nowUtc, int take = 12, int days = 30,
+        CancellationToken ct = default)
+    {
+        take = Math.Clamp(take, 1, 48);
+        var since = nowUtc.AddDays(-days);
+        await using var db = dbFactory.CreateDbContext();
+
+        var ranking = await db.OrderItems
+            .Where(i => db.Orders.Any(o => o.Id == i.OrderId && SoldStatuses.Contains(o.Status) && o.CreatedAtUtc >= since))
+            .Join(db.ProductVariants, i => i.VariantId, v => v.Id, (i, v) => new { v.ProductId, i.Quantity })
+            .GroupBy(x => x.ProductId)
+            .Select(g => new { ProductId = g.Key, Units = g.Sum(x => x.Quantity) })
+            .OrderByDescending(x => x.Units)
+            .Take(take * 2) // margen por si alguno está inactivo
+            .ToListAsync(ct);
+
+        var ids = ranking.Select(r => r.ProductId).ToList();
+        var bestSellers = (await CardsAsync(db.Products.Where(p => ids.Contains(p.Id)), ct))
+            .OrderBy(c => ids.IndexOf(c.Id)).Take(take).ToList();
+        if (bestSellers.Count >= take)
+            return bestSellers;
+
+        var chosen = bestSellers.Select(c => c.Id).ToList();
+        var newest = await CardsAsync(db.Products.Where(p => !chosen.Contains(p.Id)).OrderByDescending(p => p.Id)
+            .Take(take - bestSellers.Count), ct);
+        return bestSellers.Concat(newest.OrderByDescending(c => c.Id)).ToList();
+    }
+
+    /// <summary>Tarjetas de productos activos con variantes (foto principal, precio mínimo y disponible).</summary>
+    private static async Task<List<ProductCardDto>> CardsAsync(IQueryable<Product> products, CancellationToken ct)
+    {
+        var rows = await products.AsNoTracking().Where(p => p.IsActive && p.Variants.Any())
+            .Select(p => new
+            {
+                p.Id, p.Slug, p.Name, p.Brand, p.Category, p.ImageUrl,
+                MainImageId = p.Images.OrderBy(i => i.SortOrder).Select(i => (Guid?)i.Id).FirstOrDefault(),
+                MinPrice = p.Variants.Min(v => v.Price),
+                Available = p.Variants.Sum(v => v.StockOnHand - v.StockReserved)
+            }).ToListAsync(ct);
+        return rows.Select(p => new ProductCardDto(p.Id, p.Slug, p.Name, p.Brand, p.Category,
+            ImageUrl(p.MainImageId, p.ImageUrl), p.MinPrice, p.Available)).ToList();
     }
 
     public async Task<ProductDetailDto?> GetBySlugAsync(string slug, CancellationToken ct = default)

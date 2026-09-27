@@ -242,6 +242,61 @@ public class OrderServicesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Trending_ranks_units_sold_in_the_last_30_days_and_ignores_unpaid_cancelled_and_old_orders()
+    {
+        var checkout = Checkout();
+        var admin = Admin();
+        async Task<PlaceOrderResult> Sell(int product, bool validate = true)
+        {
+            var request = Request(0);
+            request.Lines = [new CartLine(_products[product].Variants[0].Id, 1)];
+            var result = await checkout.PlaceOrderAsync(request);
+            if (validate)
+                await admin.ValidatePaymentAsync(result.OrderId, TestData.TenantAdmin, null);
+            return result;
+        }
+
+        // Ventas viejas (hace 31 días) del producto 60: no cuentan.
+        for (var i = 0; i < 10; i++)
+            await Sell(60);
+        _clock.Advance(TimeSpan.FromDays(31));
+
+        // 100 pedidos recientes: el producto p (0..9) vende p+1 unidades; 45 productos más venden 1 cada uno.
+        var orders = 0;
+        for (var p = 0; p < 10; p++)
+        for (var n = 0; n <= p; n++, orders++)
+        {
+            var result = await Sell(p, validate: p != 9);           // los del 9 quedan sin validar
+            if (p == 8)
+                await admin.CancelAsync(result.OrderId, TestData.TenantAdmin, "Cancelado");  // los del 8 se cancelan
+        }
+        for (var p = 10; orders < TestData.BatchSize; p++, orders++)
+            await Sell(p);
+
+        var catalog = new CgShop.Application.Catalog.CatalogService(_factory);
+        var trending = await catalog.GetTrendingAsync(_clock.GetUtcNow().UtcDateTime, take: 5);
+        trending.Select(c => c.Id).Should().Equal(
+            _products[7].Id, _products[6].Id, _products[5].Id, _products[4].Id, _products[3].Id);
+
+        var all = await catalog.GetTrendingAsync(_clock.GetUtcNow().UtcDateTime, take: 48);
+        all.Should().OnlyHaveUniqueItems(c => c.Id);
+        all.Select(c => c.Id).Should().NotContain(_products[60].Id, "sus ventas son de hace más de 30 días")
+            .And.NotContain(_products[9].Id, "sus pedidos no tienen pago validado")
+            .And.NotContain(_products[8].Id, "sus pedidos se cancelaron");
+    }
+
+    [Fact]
+    public async Task Trending_without_sales_falls_back_to_newest_products()
+    {
+        var catalog = new CgShop.Application.Catalog.CatalogService(_factory);
+        var trending = await catalog.GetTrendingAsync(_clock.GetUtcNow().UtcDateTime, take: 12);
+
+        trending.Should().HaveCount(12);
+        var newest = await catalog.SearchAsync(new CgShop.Application.Catalog.CatalogQuery(PageSize: 12));
+        trending.Select(c => c.Id).Should().BeEquivalentTo(newest.Items.Select(c => c.Id));
+    }
+
+    [Fact]
     public async Task Dashboard_counts_statuses_and_revenue()
     {
         var checkout = Checkout();

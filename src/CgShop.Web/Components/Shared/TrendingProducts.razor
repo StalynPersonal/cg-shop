@@ -1,0 +1,62 @@
+@* "Productos en tendencia": fila deslizable (dedo o flechas) con los más vendidos. *@
+@inject IJSRuntime JS
+
+@if (Products.Count > 0)
+{
+    <section class="cg-trending mb-8" data-testid="trending">
+        <MudText Typo="Typo.h5" Class="mb-3"><b>@Title</b></MudText>
+        <div class="cg-trending-wrap">
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Class="cg-trending-arrow left" aria-label="Anteriores"
+                           OnClick="() => PageAsync(-1)" />
+            <div class="cg-trending-track" @ref="_track">
+                @foreach (var product in Products)
+                {
+                    <a href="@($"/producto/{product.Slug}")" class="cg-trending-card" data-testid="trending-card">
+                        <div class="cg-trending-image">
+                            @if (product.ImageUrl is not null)
+                            {
+                                <img src="@product.ImageUrl" alt="@product.Name" loading="lazy" />
+                            }
+                            else
+                            {
+                                <MudIcon Icon="@Ui.CategoryIcon(product.Category)" Style="font-size:4rem" Color="Color.Primary" />
+                            }
+                        </div>
+                        @if (product.Brand is not null)
+                        {
+                            <div class="cg-trending-brand">@product.Brand</div>
+                        }
+                        <div class="cg-trending-name">@product.Name</div>
+                        <div class="cg-trending-price">@Ui.Money(product.MinPrice, Currency)</div>
+                        @if (product.Available <= 0)
+                        {
+                            <div class="cg-trending-soldout">Agotado</div>
+                        }
+                    </a>
+                }
+            </div>
+            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Class="cg-trending-arrow right" aria-label="Siguientes"
+                           OnClick="() => PageAsync(1)" />
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ProductCardDto> Products { get; set; } = [];
+    [Parameter] public string Currency { get; set; } = "DOP";
+    [Parameter] public string Title { get; set; } = "Productos en tendencia";
+
+    private ElementReference _track;
+
+    private async Task PageAsync(int direction)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("cgScroller.page", _track, direction);
+        }
+        catch (JSDisconnectedException)
+        {
+            // El circuito se cerró: no hay nada que desplazar.
+        }
+    }
+}
