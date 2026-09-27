@@ -1,0 +1,52 @@
+@* Carrusel de portada: banners del propietario con texto y botón opcionales. Con uno solo no rota. *@
+@using CgShop.Application.Marketing
+
+<MudCarousel TData="object" Class="cg-hero-carousel rounded-lg mb-6" AutoCycle="@(Banners.Count > 1)"
+             AutoCycleTime="TimeSpan.FromSeconds(6)" ShowArrows="@(Banners.Count > 1)" ShowBullets="@(Banners.Count > 1)"
+             EnableSwipeGesture="true" data-testid="hero-carousel">
+    @foreach (var banner in Banners)
+    {
+        <MudCarouselItem Transition="Transition.Slide" data-testid="hero-slide">
+            @if (banner.LinkUrl is not null && banner.ButtonText is null)
+            {
+                @* Sin botón: todo el banner es el enlace. *@
+                <a href="@banner.LinkUrl" class="cg-hero-slide" aria-label="@(banner.Title ?? "Ver más")">
+                    @Slide(banner)
+                </a>
+            }
+            else
+            {
+                <div class="cg-hero-slide">@Slide(banner)</div>
+            }
+        </MudCarouselItem>
+    }
+</MudCarousel>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<BannerDto> Banners { get; set; } = [];
+
+    private static RenderFragment Slide(BannerDto banner) => __builder =>
+    {
+        <img src="@banner.Url" alt="@(banner.Title ?? "Promoción")" />
+        @if (banner.Title is not null || banner.Subtitle is not null || banner.ButtonText is not null)
+        {
+            <div class="cg-hero-caption">
+                @if (banner.Title is not null)
+                {
+                    <div class="cg-hero-title">@banner.Title</div>
+                }
+                @if (banner.Subtitle is not null)
+                {
+                    <div class="cg-hero-subtitle">@banner.Subtitle</div>
+                }
+                @if (banner.ButtonText is not null && banner.LinkUrl is not null)
+                {
+                    <MudButton Href="@banner.LinkUrl" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3"
+                               EndIcon="@Icons.Material.Filled.ArrowForward" data-testid="hero-button">
+                        @banner.ButtonText
+                    </MudButton>
+                }
+            </div>
+        }
+    };
+}

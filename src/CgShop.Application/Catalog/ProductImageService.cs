@@ -126,7 +126,7 @@ public sealed class ProductImageService(
         await db.SaveChangesAsync(ct);
     }
 
-    private static async Task CopyWithLimitAsync(Stream source, Stream target, long max, string fileName,
+    internal static async Task CopyWithLimitAsync(Stream source, Stream target, long max, string fileName,
         CancellationToken ct)
     {
         var chunk = new byte[81920];

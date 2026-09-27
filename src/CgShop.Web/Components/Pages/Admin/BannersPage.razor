@@ -1,0 +1,157 @@
+@page "/admin/portada"
+@attribute [Authorize(Policy = Policies.TenantAdmin)]
+@using CgShop.Application.Marketing
+@using CgShop.Domain.Marketing
+@using Microsoft.Extensions.Options
+@inject BannerService Banners
+@inject IOptions<CatalogOptions> CatalogOptions
+
+<PageTitle>Portada · @Host.Tenant?.Name</PageTitle>
+<MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-4">
+    <MudStack Spacing="0">
+        <MudText Typo="Typo.h4">Portada</MudText>
+        <MudText Class="mud-text-secondary">
+            Banners del carrusel de inicio (@_banners.Count/@StoreBanner.MaxPerStore). Imagen horizontal JPG, PNG o WebP,
+            recomendado 1920×640 px, máximo @MaxMb MB.
+        </MudText>
+    </MudStack>
+    <MudFileUpload T="IBrowserFile" Accept="@ProductImageValidator.AcceptAttribute" FilesChanged="UploadAsync"
+                   Disabled="@(_uploading || _banners.Count >= StoreBanner.MaxPerStore)">
+        <CustomContent>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddPhotoAlternate"
+                       OnClick="@context.OpenFilePickerAsync" data-testid="upload-banner"
+                       Disabled="@(_uploading || _banners.Count >= StoreBanner.MaxPerStore)">
+                @(_uploading ? "Subiendo..." : "Agregar banner")
+            </MudButton>
+        </CustomContent>
+    </MudFileUpload>
+</MudStack>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else if (_banners.Count == 0)
+{
+    <MudAlert Severity="Severity.Info" data-testid="no-banners">
+        Aún no hay banners. Mientras tanto la portada muestra el nombre de la tienda sobre su color.
+    </MudAlert>
+}
+else
+{
+    <MudStack Spacing="4">
+        @foreach (var (banner, index) in _banners.Select((b, i) => (b, i)))
+        {
+            var edit = _edits[banner.Id];
+            <MudPaper Outlined="true" Class="pa-3" data-testid="banner-item">
+                <MudGrid Spacing="3">
+                    <MudItem xs="12" md="5">
+                        <div class="cg-banner-preview rounded @(edit.IsActive ? "" : "inactive")">
+                            <img src="@banner.Url" alt="@(banner.Title ?? "Banner")" />
+                        </div>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                            #@(index + 1) · @banner.Width×@banner.Height px · @Ui.FileSize(banner.SizeBytes)
+                        </MudText>
+                    </MudItem>
+                    <MudItem xs="12" md="7">
+                        <MudGrid Spacing="2">
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="edit.Title" Label="Título (opcional)" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" MaxLength="StoreBanner.TitleMax" />
+                            </MudItem>
+                            <MudItem xs="12" sm="6">
+                                <MudTextField @bind-Value="edit.ButtonText" Label="Texto del botón (opcional)" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" MaxLength="StoreBanner.ButtonMax" Placeholder="Comprar ahora" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="edit.Subtitle" Label="Texto (opcional)" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" MaxLength="StoreBanner.SubtitleMax" />
+                            </MudItem>
+                            <MudItem xs="12">
+                                <MudTextField @bind-Value="edit.LinkUrl" Label="Al hacer clic lleva a" Variant="Variant.Outlined"
+                                              Margin="Margin.Dense" MaxLength="StoreBanner.LinkMax"
+                                              HelperText="Ej.: /seccion/mujer, /catalogo/calzados, /catalogo?q=nike o https://..." />
+                            </MudItem>
+                        </MudGrid>
+                        <div class="cg-actions mt-2">
+                            <MudSwitch T="bool" @bind-Value="edit.IsActive" Color="Color.Primary"
+                                       Label="@(edit.IsActive ? "Visible" : "Oculto")" />
+                            <MudSpacer />
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Disabled="@(index == 0)"
+                                           OnClick="() => MoveAsync(banner, -1)" aria-label="Subir" />
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                           Disabled="@(index == _banners.Count - 1)" OnClick="() => MoveAsync(banner, 1)" aria-label="Bajar" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="() => DeleteAsync(banner)" aria-label="Eliminar banner" />
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                                       StartIcon="@Icons.Material.Filled.Save" OnClick="() => SaveAsync(banner)"
+                                       data-testid="save-banner">Guardar</MudButton>
+                        </div>
+                    </MudItem>
+                </MudGrid>
+            </MudPaper>
+        }
+    </MudStack>
+}
+
+@code {
+    private IReadOnlyList<BannerDto> _banners = [];
+    private Dictionary<Guid, BannerContentDto> _edits = [];
+    private bool _loading = true;
+    private bool _uploading;
+
+    private CatalogOptions Opts => CatalogOptions.Value;
+    private string MaxMb => (Opts.MaxImageBytes / 1024d / 1024d).ToString("0.#");
+
+    protected override async Task OnAdminInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _banners = await Banners.ListAsync(Actor);
+        _edits = _banners.ToDictionary(b => b.Id, b => new BannerContentDto
+        {
+            Title = b.Title, Subtitle = b.Subtitle, ButtonText = b.ButtonText, LinkUrl = b.LinkUrl, IsActive = b.IsActive
+        });
+        _loading = false;
+    }
+
+    private async Task UploadAsync(IBrowserFile? file)
+    {
+        if (file is null)
+            return;
+        if (file.Size > Opts.MaxImageBytes)
+        {
+            Snackbar.Add($"'{file.Name}' supera el máximo de {MaxMb} MB.", Severity.Warning);
+            return;
+        }
+
+        _uploading = true;
+        if (await Snackbar.TryAsync(async () =>
+            {
+                await using var stream = file.OpenReadStream(Opts.MaxImageBytes);
+                await Banners.UploadAsync(file.Name, stream, file.Size, Actor);
+            }, "Banner agregado. Puede agregarle título, texto y enlace."))
+            await LoadAsync();
+        _uploading = false;
+    }
+
+    private async Task SaveAsync(BannerDto banner)
+    {
+        if (await Snackbar.TryAsync(() => Banners.UpdateAsync(banner.Id, _edits[banner.Id], Actor), "Banner guardado."))
+            await LoadAsync();
+    }
+
+    private async Task MoveAsync(BannerDto banner, int offset)
+    {
+        if (await Snackbar.TryAsync(() => Banners.MoveAsync(banner.Id, offset, Actor)))
+            await LoadAsync();
+    }
+
+    private async Task DeleteAsync(BannerDto banner)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Eliminar banner", "¿Quitar este banner de la portada?",
+            "Eliminar", cancelText: "Cancelar");
+        if (confirmed == true && await Snackbar.TryAsync(() => Banners.DeleteAsync(banner.Id, Actor), "Banner eliminado."))
+            await LoadAsync();
+    }
+}

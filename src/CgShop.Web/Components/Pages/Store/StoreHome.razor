@@ -1,15 +1,23 @@
 @inject CatalogService Catalog
+@inject CgShop.Application.Marketing.BannerService BannerService
 
 <PageTitle>@Host.Tenant?.Name</PageTitle>
 
-<MudPaper Class="cg-hero pa-8 mb-6" Elevation="0">
-    <MudText Typo="Typo.h3">@Host.Tenant?.Name</MudText>
-    <MudText Typo="Typo.h6" Class="mt-2" Style="opacity:.9">
-        Ropa, gorras, relojes, perfumes y calzados. Paga por transferencia o enlace de pago.
-    </MudText>
-    <MudButton Href="/catalogo" Variant="Variant.Filled" Color="Color.Secondary" Class="mt-4"
-               EndIcon="@Icons.Material.Filled.ArrowForward">Ver catálogo</MudButton>
-</MudPaper>
+@if (_banners.Count > 0)
+{
+    <HeroCarousel Banners="_banners" />
+}
+else
+{
+    <MudPaper Class="cg-hero pa-8 mb-6" Elevation="0" data-testid="default-hero">
+        <MudText Typo="Typo.h3">@Host.Tenant?.Name</MudText>
+        <MudText Typo="Typo.h6" Class="mt-2" Style="opacity:.9">
+            Ropa, gorras, relojes, perfumes y calzados. Paga por transferencia o enlace de pago.
+        </MudText>
+        <MudButton Href="/catalogo" Variant="Variant.Filled" Color="Color.Secondary" Class="mt-4"
+                   EndIcon="@Icons.Material.Filled.ArrowForward">Ver catálogo</MudButton>
+    </MudPaper>
+}
 
 <MudGrid Spacing="2" Class="mb-6">
     @foreach (var category in Enum.GetValues<ProductCategory>())
@@ -32,13 +40,17 @@
 }
 else
 {
-    <ProductGrid Products="_products.Items" Currency="@Host.Currency" />
+        <ProductGrid Products="_products.Items" Currency="@Host.Currency" />
 }
 
 @code {
     [CascadingParameter] private HostContext Host { get; set; } = default!;
     private PagedResult<ProductCardDto>? _products;
+    private IReadOnlyList<CgShop.Application.Marketing.BannerDto> _banners = [];
 
-    protected override async Task OnInitializedAsync() =>
+    protected override async Task OnInitializedAsync()
+    {
+        _banners = await BannerService.ListActiveAsync();
         _products = await Catalog.SearchAsync(new CatalogQuery(PageSize: 8));
+    }
 }

@@ -151,6 +151,20 @@ public static class ProductImageEndpoints
             http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
             return Results.File(file.Value.Content, file.Value.ContentType);
         });
+
+        // Banners del carrusel de portada (mismo criterio: nombre único, caché larga).
+        app.MapGet("/banners/{id:guid}", async (Guid id, CgShop.Application.Marketing.BannerService banners,
+            ITenantContext tenant, HttpContext http) =>
+        {
+            if (!tenant.HasTenant)
+                return Results.NotFound();
+            var file = await banners.OpenAsync(id, http.RequestAborted);
+            if (file is null)
+                return Results.NotFound();
+            http.Response.Headers.XContentTypeOptions = "nosniff";
+            http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(file.Value.Content, file.Value.ContentType);
+        });
         return app;
     }
 }

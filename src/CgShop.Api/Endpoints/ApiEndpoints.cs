@@ -1,5 +1,6 @@
 using CgShop.Application.Catalog;
 using CgShop.Application.Common;
+using CgShop.Application.Marketing;
 using CgShop.Application.Orders;
 using CgShop.Application.Tenancy;
 using CgShop.Application.Tenants;
@@ -65,6 +66,8 @@ public static class StoreEndpoints
             catalog.SearchAsync(new CatalogQuery(category, search, size, color, Sort: sort ?? CatalogSort.Newest,
                 Page: page ?? 1, PageSize: pageSize ?? 24, Audience: audience), ct));
 
+        store.MapGet("/banners", (BannerService service, CancellationToken ct) => service.ListActiveAsync(ct));
+
         store.MapGet("/catalog/{slug}", async (string slug, CatalogService catalog, CancellationToken ct) =>
             await catalog.GetBySlugAsync(slug, ct) is { } product ? Results.Ok(product) : Results.NotFound());
 
@@ -74,6 +77,18 @@ public static class StoreEndpoints
             if (!tenant.HasTenant)
                 return Results.NotFound();
             var file = await images.OpenAsync(id, ct);
+            if (file is null)
+                return Results.NotFound();
+            http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(file.Value.Content, file.Value.ContentType);
+        }).WithTags("Tienda");
+
+        app.MapGet("/banners/{id:guid}", async (Guid id, BannerService banners, ITenantContext tenant,
+            HttpContext http, CancellationToken ct) =>
+        {
+            if (!tenant.HasTenant)
+                return Results.NotFound();
+            var file = await banners.OpenAsync(id, ct);
             if (file is null)
                 return Results.NotFound();
             http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
@@ -259,6 +274,30 @@ public static class AdminEndpoints
             await settings.UpdatePaymentSettingsAsync(body, http.User.ToActor(), ct);
             return Results.NoContent();
         }).RequireAuthorization(ApiPolicies.TenantAdmin);
+
+        // Carrusel de portada (solo propietario).
+        var banners = admin.MapGroup("/banners").RequireAuthorization(ApiPolicies.TenantAdmin);
+        banners.MapGet("", (BannerService service, HttpContext http, CancellationToken ct) =>
+            service.ListAsync(http.User.ToActor(), ct));
+        banners.MapPost("", async (IFormFile file, BannerService service, HttpContext http, CancellationToken ct) =>
+        {
+            await using var stream = file.OpenReadStream();
+            var banner = await service.UploadAsync(file.FileName, stream, file.Length, http.User.ToActor(), ct);
+            return Results.Created($"/api/admin/banners/{banner.Id}", banner);
+        }).DisableAntiforgery();
+        banners.MapPut("/{id:guid}", (Guid id, BannerContentDto body, BannerService service, HttpContext http,
+            CancellationToken ct) => service.UpdateAsync(id, body, http.User.ToActor(), ct));
+        banners.MapPost("/{id:guid}/move", async (Guid id, int offset, BannerService service, HttpContext http,
+            CancellationToken ct) =>
+        {
+            await service.MoveAsync(id, offset, http.User.ToActor(), ct);
+            return Results.NoContent();
+        });
+        banners.MapDelete("/{id:guid}", async (Guid id, BannerService service, HttpContext http, CancellationToken ct) =>
+        {
+            await service.DeleteAsync(id, http.User.ToActor(), ct);
+            return Results.NoContent();
+        });
 
         return app;
     }
