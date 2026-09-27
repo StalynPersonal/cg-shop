@@ -22,7 +22,8 @@ builder.Services.AddMudServices(o =>
     o.SnackbarConfiguration.VisibleStateDuration = 4000;
 });
 
-builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddInfrastructure(builder.Configuration,
+    enableBackgroundJobs: builder.Configuration.GetValue("Jobs:Enabled", true));
 
 // Autenticación por cookie de Identity. La cookie es "host-only": cada subdominio (tienda) tiene su propia sesión.
 builder.Services.AddCascadingAuthenticationState();
@@ -32,6 +33,11 @@ builder.Services.AddAuthentication(o =>
         o.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     })
     .AddIdentityCookies();
+// Cierre por inactividad: la cookie vence tras N minutos sin renovarse (configurable en "Session").
+// En el navegador, SessionTimeoutGuard la renueva solo mientras hay actividad real del usuario.
+builder.Services.Configure<SessionTimeoutOptions>(builder.Configuration.GetSection(SessionTimeoutOptions.Section));
+var sessionOptions = builder.Configuration.GetSection(SessionTimeoutOptions.Section).Get<SessionTimeoutOptions>()
+                     ?? new SessionTimeoutOptions();
 builder.Services.ConfigureApplicationCookie(o =>
 {
     o.Cookie.Name = "cgshop.auth";
@@ -40,7 +46,7 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.LoginPath = "/cuenta/login";
     o.AccessDeniedPath = "/cuenta/acceso-denegado";
     o.SlidingExpiration = true;
-    o.ExpireTimeSpan = TimeSpan.FromHours(8);
+    o.ExpireTimeSpan = sessionOptions.IdleTimeout;
 });
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Policies.TenantStaff, p => p.RequireRole(Roles.TenantAdmin, Roles.TenantStaff))

@@ -1,5 +1,11 @@
 @inherits LayoutComponentBase
 
+<AuthorizeView>
+    <Authorized>
+        <SessionTimeoutGuard />
+    </Authorized>
+</AuthorizeView>
+
 <MudLayout>
     <MudAppBar Elevation="1" Color="Color.Primary">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"

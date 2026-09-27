@@ -2,6 +2,12 @@
 @implements IDisposable
 @inject CartState Cart
 
+<AuthorizeView>
+    <Authorized>
+        <SessionTimeoutGuard />
+    </Authorized>
+</AuthorizeView>
+
 <MudLayout>
     <MudAppBar Elevation="1" Color="Color.Primary">
         <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="d-flex align-center gap-2">

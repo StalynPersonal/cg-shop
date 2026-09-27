@@ -1,0 +1,80 @@
+@* Cierra la sesión tras N minutos sin actividad (configurable) y avisa antes con cuenta regresiva. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject IOptions<SessionTimeoutOptions> Options
+@using Microsoft.Extensions.Options
+
+@if (_secondsLeft is { } seconds)
+{
+    <div class="cg-session-warning" role="alertdialog" aria-live="assertive" data-testid="session-warning">
+        <MudPaper Elevation="8" Class="pa-6" Style="max-width:420px">
+            <MudStack Spacing="2">
+                <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="2">
+                    <MudIcon Icon="@Icons.Material.Filled.TimerOff" Color="Color.Warning" />
+                    <MudText Typo="Typo.h6">¿Sigues ahí?</MudText>
+                </MudStack>
+                <MudText>
+                    Por seguridad, tu sesión se cerrará por inactividad en
+                    <b data-testid="session-seconds">@seconds</b> segundos.
+                </MudText>
+                <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                    <MudButton Variant="Variant.Text" Href="@ExpireUrl">Cerrar sesión</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="StayConnectedAsync"
+                               data-testid="session-stay">Seguir conectado</MudButton>
+                </MudStack>
+            </MudStack>
+        </MudPaper>
+    </div>
+}
+
+@code {
+    public const string PingUrl = "/cuenta/mantener-sesion";
+    public const string ExpireUrl = "/cuenta/sesion-expirada";
+
+    private DotNetObjectReference<SessionTimeoutGuard>? _ref;
+    private int? _secondsLeft;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+        var o = Options.Value;
+        _ref = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("cgSession.start", _ref, (int)o.IdleTimeout.TotalSeconds, o.EffectiveWarningSeconds,
+            o.EffectiveKeepAliveSeconds, PingUrl, ExpireUrl);
+    }
+
+    [JSInvokable]
+    public Task ShowWarning(int secondsLeft)
+    {
+        _secondsLeft = secondsLeft;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public Task HideWarning()
+    {
+        _secondsLeft = null;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private async Task StayConnectedAsync()
+    {
+        _secondsLeft = null;
+        await JS.InvokeVoidAsync("cgSession.stayConnected");
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("cgSession.stop");
+        }
+        catch (JSDisconnectedException)
+        {
+            // el circuito ya se cerró
+        }
+
+        _ref?.Dispose();
+    }
+}

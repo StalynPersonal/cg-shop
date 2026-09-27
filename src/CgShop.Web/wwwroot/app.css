@@ -56,6 +56,17 @@ html, body {
     color: var(--mud-palette-primary);
 }
 
+/* Aviso de cierre de sesión por inactividad */
+.cg-session-warning {
+    position: fixed;
+    inset: 0;
+    z-index: 2100;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    background: rgba(0, 0, 0, .45);
+}
+
 /* Galería de producto */
 .cg-gallery-main {
     aspect-ratio: 1 / 1;

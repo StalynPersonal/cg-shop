@@ -71,6 +71,25 @@ public static class AccountEndpoints
             return Results.LocalRedirect("/");
         });
 
+        // Renueva la cookie mientras el usuario está activo (lo llama session-timeout.js).
+        app.MapGet("/cuenta/mantener-sesion", async (HttpContext http, SignInManager<ApplicationUser> signIn,
+            UserManager<ApplicationUser> users) =>
+        {
+            var user = await users.GetUserAsync(http.User);
+            if (user is null)
+                return Results.Unauthorized();
+            await signIn.RefreshSignInAsync(user); // reinicia el plazo de inactividad
+            http.Response.Headers.CacheControl = "no-store";
+            return Results.NoContent();
+        }).RequireAuthorization();
+
+        // Destino al vencer el plazo de inactividad: cierra la sesión y avisa en el login.
+        app.MapGet("/cuenta/sesion-expirada", async (SignInManager<ApplicationUser> signIn) =>
+        {
+            await signIn.SignOutAsync();
+            return Results.LocalRedirect("/cuenta/login?expirada=1");
+        });
+
         // Diagnóstico (solo desarrollo): claims del usuario actual.
         if (app is WebApplication { Environment: var env } && env.IsDevelopment())
         {

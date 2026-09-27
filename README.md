@@ -174,6 +174,19 @@ dotnet test tests/CgShop.IntegrationTests
 
 ---
 
+### Cierre de sesión por inactividad
+
+Tras **15 minutos sin actividad** (mouse, teclado, toque o scroll) la sesión se cierra sola.
+Un minuto antes aparece un aviso con cuenta regresiva y el botón "Seguir conectado".
+La actividad se comparte entre pestañas. El servidor también aplica el plazo: la cookie vence si no se renueva,
+y solo se renueva mientras hay actividad real. Se configura en `src/CgShop.Web/appsettings.json`:
+
+```json
+"Session": { "IdleTimeoutMinutes": 15, "WarningSeconds": 60 }
+```
+
+Prueba de la lógica del navegador: `node tests/js/session-timeout.sim.js`.
+
 ## 4. Producción
 
 - **DNS comodín** `*.tudominio.com` y certificado TLS comodín. Configure `Tenancy:RootDomains = ["tudominio.com"]`.

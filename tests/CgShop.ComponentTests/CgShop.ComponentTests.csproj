@@ -13,6 +13,7 @@
     <PackageReference Include="bunit" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <ProjectReference Include="..\..\src\CgShop.Web\CgShop.Web.csproj" />
   </ItemGroup>
   <ItemGroup>

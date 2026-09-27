@@ -9,6 +9,12 @@
                 <MudText Typo="Typo.h5">
                     @(Host.IsAdmin ? "Acceso Super Admin" : $"Iniciar sesión en {Host.Tenant?.Name}")
                 </MudText>
+                @if (Expirada == "1")
+                {
+                    <MudAlert Severity="Severity.Warning" data-testid="session-expired">
+                        Tu sesión se cerró por inactividad. Vuelve a iniciar sesión.
+                    </MudAlert>
+                }
                 @if (Error == "lockout")
                 {
                     <MudAlert Severity="Severity.Error">Cuenta bloqueada temporalmente por intentos fallidos.</MudAlert>
@@ -56,6 +62,7 @@
     [CascadingParameter] private HostContext Host { get; set; } = default!;
     [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
     [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? Expirada { get; set; }
 
     private string RegisterUrl => string.IsNullOrEmpty(ReturnUrl)
         ? "/cuenta/registro"
