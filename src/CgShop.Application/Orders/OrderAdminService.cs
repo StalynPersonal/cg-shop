@@ -87,6 +87,15 @@ public sealed class OrderAdminService(
             return Task.CompletedTask;
         }, ct);
 
+    /// <summary>Retiro en tienda: el pedido está preparado y el cliente puede pasar a buscarlo.</summary>
+    public Task MarkReadyForPickupAsync(Guid orderId, ActorInfo actor, string? note = null,
+        CancellationToken ct = default) =>
+        MutateAsync(orderId, (_, order, now) =>
+        {
+            order.MarkReadyForPickup(actor, note, now);
+            return Task.CompletedTask;
+        }, ct);
+
     public Task MarkDeliveredAsync(Guid orderId, ActorInfo actor, CancellationToken ct = default) =>
         MutateAsync(orderId, (_, order, now) =>
         {

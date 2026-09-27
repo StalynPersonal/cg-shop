@@ -173,6 +173,13 @@ public static class AdminEndpoints
             return Results.Ok(await orders.GetAsync(id, ct));
         });
 
+        admin.MapPost("/orders/{id:guid}/ready-for-pickup", async (Guid id, NoteRequest body, OrderAdminService orders,
+            HttpContext http, CancellationToken ct) =>
+        {
+            await orders.MarkReadyForPickupAsync(id, http.User.ToActor(), body.Note, ct);
+            return Results.Ok(await orders.GetAsync(id, ct));
+        });
+
         admin.MapPost("/orders/{id:guid}/deliver", async (Guid id, OrderAdminService orders, HttpContext http,
             CancellationToken ct) =>
         {

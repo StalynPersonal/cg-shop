@@ -41,10 +41,17 @@ else
                 <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.LocalShipping"
                            OnClick="Ship">Marcar enviado</MudButton>
             }
+            @if (_order.NextStatuses.Contains(OrderStatus.ReadyForPickup))
+            {
+                <MudButton Color="Color.Primary" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Storefront"
+                           OnClick="ReadyForPickup" data-testid="ready-for-pickup">Listo para retirar</MudButton>
+            }
             @if (_order.NextStatuses.Contains(OrderStatus.Delivered))
             {
                 <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.CheckCircle"
-                           OnClick="Deliver">Marcar entregado</MudButton>
+                           OnClick="Deliver" data-testid="mark-delivered">
+                    @(_order.DeliveryMethod == DeliveryMethod.Pickup ? "Marcar retirado" : "Marcar entregado")
+                </MudButton>
             }
             @if (_order.NextStatuses.Contains(OrderStatus.Cancelled))
             {
@@ -198,7 +205,17 @@ else
                 "Pedido marcado como enviado.");
     }
 
-    private Task Deliver() => Run(() => Orders.MarkDeliveredAsync(Id, Actor), "Pedido entregado.");
+    private Task Deliver() => Run(() => Orders.MarkDeliveredAsync(Id, Actor),
+        _order?.DeliveryMethod == DeliveryMethod.Pickup ? "Pedido retirado por el cliente." : "Pedido entregado.");
+
+    private async Task ReadyForPickup()
+    {
+        var note = await TextPromptDialog.AskAsync(Dialogs, "Listo para retirar", "Nota para el cliente (opcional)",
+            false, "Marcar listo", Color.Primary, "El cliente verá que su pedido ya puede retirarse en la tienda.");
+        if (note is not null)
+            await Run(() => Orders.MarkReadyForPickupAsync(Id, Actor, string.IsNullOrWhiteSpace(note) ? null : note),
+                "Pedido listo para retirar.");
+    }
 
     private async Task Cancel()
     {

@@ -7,6 +7,9 @@ public enum OrderStatus
     Preparing = 3,
     Shipped = 4,
     Delivered = 5,
+
+    /// <summary>Pedido de retiro en tienda preparado y esperando al cliente.</summary>
+    ReadyForPickup = 6,
     PaymentRejected = 10,
     Cancelled = 11,
     Expired = 12
@@ -42,6 +45,7 @@ public static class OrderStatusExtensions
         OrderStatus.PaymentValidated => "Pago validado",
         OrderStatus.Preparing => "En preparación",
         OrderStatus.Shipped => "Enviado",
+        OrderStatus.ReadyForPickup => "Listo para retirar",
         OrderStatus.Delivered => "Entregado",
         OrderStatus.PaymentRejected => "Pago rechazado",
         OrderStatus.Cancelled => "Cancelado",

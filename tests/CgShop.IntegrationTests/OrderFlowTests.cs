@@ -111,6 +111,37 @@ public sealed class OrderFlowTests(SqlServerFixture fx)
     }
 
     [Fact]
+    public async Task Pickup_orders_follow_ready_for_pickup_flow_for_100_orders_in_sql()
+    {
+        var (tenant, variantIds) = await TenantWithStockAsync();
+        await using var scope = fx.TenantScope(tenant);
+        var checkout = scope.ServiceProvider.GetRequiredService<CheckoutService>();
+        var admin = scope.ServiceProvider.GetRequiredService<OrderAdminService>();
+
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var request = Request(i, variantIds);
+            request.DeliveryMethod = DeliveryMethod.Pickup;
+            request.ShippingAddress = null;
+            var order = await checkout.PlaceOrderAsync(request);
+
+            await admin.ValidatePaymentAsync(order.OrderId, TestData.TenantAdmin, null);
+            await admin.StartPreparingAsync(order.OrderId, TestData.TenantStaff);
+            await admin.Invoking(a => a.ShipAsync(order.OrderId, TestData.TenantStaff, null))
+                .Should().ThrowAsync<DomainException>();
+            await admin.MarkReadyForPickupAsync(order.OrderId, TestData.TenantStaff);
+
+            var detail = await admin.GetAsync(order.OrderId);
+            detail.Status.Should().Be(OrderStatus.ReadyForPickup);
+            detail.NextStatuses.Should().BeEquivalentTo([OrderStatus.Delivered, OrderStatus.Cancelled]);
+        }
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Orders.CountAsync(o => o.Status == OrderStatus.ReadyForPickup)).Should().Be(TestData.BatchSize);
+        (await db.OrderStatusHistory.CountAsync(h => h.ToStatus == OrderStatus.Shipped)).Should().Be(0);
+    }
+
+    [Fact]
     public async Task Owner_validates_50_and_rejects_50_stock_is_committed_or_released()
     {
         var (tenant, variantIds) = await TenantWithStockAsync(stockPerVariant: 1000);

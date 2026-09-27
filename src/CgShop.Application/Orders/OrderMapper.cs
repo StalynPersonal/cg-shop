@@ -14,7 +14,7 @@ internal static class OrderMapper
             .Select(h => new OrderHistoryDto(h.FromStatus, h.ToStatus, h.ChangedByName, h.Note, h.ReceiptId,
                 h.ChangedAtUtc)).ToList(),
         o.Receipts.OrderBy(r => r.UploadedAtUtc).Select(ToDto).ToList(),
-        OrderStateMachine.NextStatuses(o.Status));
+        OrderStateMachine.NextStatuses(o.Status, o.DeliveryMethod));
 
     public static ReceiptDto ToDto(PaymentReceipt r) =>
         new(r.Id, r.OriginalFileName, r.ContentType, r.SizeBytes, r.Reference, r.UploadedAtUtc);

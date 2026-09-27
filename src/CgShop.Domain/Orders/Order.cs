@@ -150,11 +150,29 @@ public sealed class Order : Entity, ITenantEntity
     public void StartPreparing(ActorInfo actor, DateTime nowUtc) =>
         ChangeStatusByStaff(OrderStatus.Preparing, actor, "Pedido en preparación.", nowUtc);
 
-    public void Ship(ActorInfo actor, string? trackingInfo, DateTime nowUtc) =>
+    /// <summary>Despacho a domicilio. Un pedido de retiro en tienda nunca se envía.</summary>
+    public void Ship(ActorInfo actor, string? trackingInfo, DateTime nowUtc)
+    {
+        if (DeliveryMethod == DeliveryMethod.Pickup)
+            throw new DomainException(
+                $"El pedido {Number} es para retiro en tienda: no se envía, se marca como listo para retirar.");
         ChangeStatusByStaff(OrderStatus.Shipped, actor, trackingInfo ?? "Pedido despachado.", nowUtc);
+    }
+
+    /// <summary>Pedido de retiro preparado y disponible en la tienda.</summary>
+    public void MarkReadyForPickup(ActorInfo actor, string? note, DateTime nowUtc)
+    {
+        if (DeliveryMethod != DeliveryMethod.Pickup)
+            throw new DomainException(
+                $"El pedido {Number} es con envío a domicilio: no puede marcarse como listo para retirar.");
+        ChangeStatusByStaff(OrderStatus.ReadyForPickup, actor,
+            string.IsNullOrWhiteSpace(note) ? "Pedido listo para retirar en la tienda." : note, nowUtc);
+    }
 
     public void MarkDelivered(ActorInfo actor, DateTime nowUtc) =>
-        ChangeStatusByStaff(OrderStatus.Delivered, actor, "Pedido entregado.", nowUtc);
+        ChangeStatusByStaff(OrderStatus.Delivered, actor,
+            DeliveryMethod == DeliveryMethod.Pickup ? "Pedido retirado por el cliente en la tienda." : "Pedido entregado.",
+            nowUtc);
 
     public void Cancel(ActorInfo actor, string reason, DateTime nowUtc)
     {
@@ -183,7 +201,7 @@ public sealed class Order : Entity, ITenantEntity
     private void ChangeStatus(OrderStatus target, ActorInfo actor, string? note, DateTime nowUtc,
         Guid? receiptId = null)
     {
-        if (!OrderStateMachine.CanTransition(Status, target))
+        if (!OrderStateMachine.CanTransition(Status, target, DeliveryMethod))
             throw new DomainException(
                 $"Transición inválida: la orden {Number} no puede pasar de '{Status.DisplayName()}' a '{target.DisplayName()}'.");
         var from = Status;

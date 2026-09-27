@@ -28,6 +28,7 @@ public static class Ui
         OrderStatus.PaymentValidated => Color.Info,
         OrderStatus.Preparing => Color.Primary,
         OrderStatus.Shipped => Color.Secondary,
+        OrderStatus.ReadyForPickup => Color.Tertiary,
         OrderStatus.Delivered => Color.Success,
         _ => Color.Error
     };
@@ -38,6 +39,7 @@ public static class Ui
         OrderStatus.PaymentValidated => Icons.Material.Filled.Verified,
         OrderStatus.Preparing => Icons.Material.Filled.Inventory,
         OrderStatus.Shipped => Icons.Material.Filled.LocalShipping,
+        OrderStatus.ReadyForPickup => Icons.Material.Filled.Storefront,
         OrderStatus.Delivered => Icons.Material.Filled.CheckCircle,
         OrderStatus.PaymentRejected => Icons.Material.Filled.Block,
         OrderStatus.Expired => Icons.Material.Filled.TimerOff,

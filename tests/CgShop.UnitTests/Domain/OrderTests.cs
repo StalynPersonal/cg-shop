@@ -91,6 +91,70 @@ public class OrderTests
         }
     }
 
+    private static Order PickupOrder(int i)
+    {
+        var product = TestData.Product(i);
+        var order = Order.Place($"P-{i:00000}", TestData.CustomerInfo(i) with { Delivery = DeliveryMethod.Pickup },
+            [TestData.LineFor(product.Variants[0], product, 1)], PaymentMethod.BankTransfer, 0.18m, "DOP",
+            TestData.Now, TimeSpan.FromHours(48));
+        return order;
+    }
+
+    [Fact]
+    public void Pickup_orders_go_ready_for_pickup_and_are_never_shipped_for_100_orders()
+    {
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var order = PickupOrder(i);
+            order.ValidatePayment(TestData.TenantAdmin, null, TestData.Now);
+            order.StartPreparing(TestData.TenantStaff, TestData.Now);
+
+            order.Invoking(o => o.Ship(TestData.TenantStaff, null, TestData.Now))
+                .Should().Throw<DomainException>().WithMessage("*retiro en tienda*");
+            OrderStateMachine.NextStatuses(order.Status, order.DeliveryMethod)
+                .Should().Contain(OrderStatus.ReadyForPickup).And.NotContain(OrderStatus.Shipped);
+
+            order.MarkReadyForPickup(TestData.TenantStaff, null, TestData.Now);
+            order.MarkDelivered(TestData.TenantStaff, TestData.Now);
+
+            order.Status.Should().Be(OrderStatus.Delivered);
+            order.History.Select(h => h.ToStatus).Should().Equal(
+                OrderStatus.PendingPaymentValidation, OrderStatus.PaymentValidated, OrderStatus.Preparing,
+                OrderStatus.ReadyForPickup, OrderStatus.Delivered);
+            order.History.Should().NotContain(h => h.ToStatus == OrderStatus.Shipped);
+            order.History[^1].Note.Should().Contain("retirado");
+        }
+    }
+
+    [Fact]
+    public void Shipping_orders_cannot_be_marked_ready_for_pickup_for_100_orders()
+    {
+        foreach (var order in TestData.Orders())
+        {
+            order.ValidatePayment(TestData.TenantAdmin, null, TestData.Now);
+            order.StartPreparing(TestData.TenantStaff, TestData.Now);
+
+            order.Invoking(o => o.MarkReadyForPickup(TestData.TenantStaff, null, TestData.Now))
+                .Should().Throw<DomainException>().WithMessage("*envío a domicilio*");
+            OrderStateMachine.NextStatuses(order.Status, order.DeliveryMethod)
+                .Should().Contain(OrderStatus.Shipped).And.NotContain(OrderStatus.ReadyForPickup);
+        }
+    }
+
+    [Fact]
+    public void Pickup_order_can_be_cancelled_while_waiting_and_counts_as_paid()
+    {
+        var order = PickupOrder(1);
+        order.ValidatePayment(TestData.TenantAdmin, null, TestData.Now);
+        order.StartPreparing(TestData.TenantStaff, TestData.Now);
+        order.MarkReadyForPickup(TestData.TenantStaff, "Pase de 9 a 6", TestData.Now);
+
+        order.IsPaid.Should().BeTrue();
+        order.History[^1].Note.Should().Be("Pase de 9 a 6");
+        order.Cancel(TestData.TenantStaff, "El cliente nunca retiró", TestData.Now);
+        order.Status.Should().Be(OrderStatus.Cancelled);
+    }
+
     [Fact]
     public void Rejected_payment_is_terminal_and_requires_reason()
     {

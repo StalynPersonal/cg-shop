@@ -92,6 +92,29 @@ public sealed class AdminPagesTests : StoreTestContext
     }
 
     [Fact]
+    public async Task Pickup_order_in_preparation_offers_ready_for_pickup_and_never_ship()
+    {
+        await SeedProductsAsync(5);
+        var order = (await SeedOrdersAsync(1))[0];
+        await using (var db = CreateDb())
+        {
+            var entity = await db.Orders.Include(o => o.History).FirstAsync(o => o.Id == order.OrderId);
+            // Convierte el pedido semilla en retiro en tienda y lo lleva a "En preparación".
+            db.Entry(entity).Property(nameof(CgShop.Domain.Orders.Order.DeliveryMethod)).CurrentValue = DeliveryMethod.Pickup;
+            db.Entry(entity).Property(nameof(CgShop.Domain.Orders.Order.ShippingAddress)).CurrentValue = null;
+            entity.ValidatePayment(TestData.TenantAdmin, null, DateTime.UtcNow);
+            entity.StartPreparing(TestData.TenantStaff, DateTime.UtcNow);
+            await db.SaveChangesAsync();
+        }
+
+        AuthorizeAs(TestData.TenantStaff);
+        var cut = Render<OrderDetail>(p => p.AddCascadingValue(HostContext).Add(x => x.Id, order.OrderId));
+
+        cut.WaitForAssertion(() => cut.Find("[data-testid='ready-for-pickup']"));
+        cut.Markup.Should().NotContain("Marcar enviado");
+    }
+
+    [Fact]
     public async Task Staff_detail_hides_validation_actions()
     {
         await SeedProductsAsync(5);
