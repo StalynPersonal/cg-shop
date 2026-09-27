@@ -40,7 +40,10 @@ public sealed class DataSeeder(
             await CreateUserAsync(SuperAdminEmail, "Super Administrador", null, Roles.SuperAdmin);
 
         if (await db.Tenants.AnyAsync(ct))
+        {
+            await BackfillDemoContactAsync(ct);
             return;
+        }
 
         await SeedTenantAsync("Tienda Verde", "verde", "#2E7D32", "Banco Popular", ct);
         await SeedTenantAsync("Tienda Roja", "rojo", "#C62828", "Banco BHD", ct);
@@ -62,6 +65,7 @@ public sealed class DataSeeder(
             ],
             PaymentLinkUrl = $"https://pagos.ejemplo.com/{slug}",
             Instructions = "Envíe el comprobante indicando su número de orden. Validamos pagos en horario laborable.",
+            WhatsAppNumber = slug == "verde" ? "+1 809 555 1234" : "+1 829 555 9876",
             PickupAddress = slug == "verde"
                 ? "Av. Abraham Lincoln #100, Piantini, Santo Domingo (L-S 9:00-18:00)"
                 : "C/ El Conde #50, Zona Colonial, Santo Domingo (L-S 10:00-19:00)"
@@ -96,6 +100,29 @@ public sealed class DataSeeder(
                 Lines = [new CartLine(variants[i * 3].Id, 1), new CartLine(variants[i * 3 + 1].Id, 2)]
             }, ct);
         }
+    }
+
+    /// <summary>Completa WhatsApp y dirección de retiro en las tiendas demo creadas antes de existir esos campos.</summary>
+    private async Task BackfillDemoContactAsync(CancellationToken ct)
+    {
+        foreach (var tenant in await db.Tenants.Where(t => t.Slug == "verde" || t.Slug == "rojo").ToListAsync(ct))
+        {
+            var ps = tenant.PaymentSettings;
+            if (ps.WhatsAppNumber is not null && ps.PickupAddress is not null)
+                continue;
+            tenant.UpdatePaymentSettings(new PaymentSettings
+            {
+                BankAccounts = ps.BankAccounts,
+                PaymentLinkUrl = ps.PaymentLinkUrl,
+                Instructions = ps.Instructions,
+                WhatsAppNumber = ps.WhatsAppNumber ?? (tenant.Slug == "verde" ? "+1 809 555 1234" : "+1 829 555 9876"),
+                PickupAddress = ps.PickupAddress ?? (tenant.Slug == "verde"
+                    ? "Av. Abraham Lincoln #100, Piantini, Santo Domingo (L-S 9:00-18:00)"
+                    : "C/ El Conde #50, Zona Colonial, Santo Domingo (L-S 10:00-19:00)")
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task CreateUserAsync(string email, string fullName, Guid? tenantId, string role)

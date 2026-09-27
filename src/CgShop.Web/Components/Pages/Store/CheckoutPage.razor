@@ -63,6 +63,7 @@ else
                             No cobramos en línea. Al confirmar, te mostraremos los datos para pagar y podrás subir tu comprobante.
                             Tu pedido se procesa cuando la tienda valide el pago; apartamos el stock mientras tanto.
                         </MudAlert>
+                        <WhatsAppContact Number="@_whatsApp" ShowButton="false" Class="mt-2" />
                     }
                 </MudForm>
             </MudPaper>
@@ -92,6 +93,7 @@ else
     private decimal _subtotal;
     private IReadOnlyList<PaymentMethod>? _methods;
     private string? _pickupAddress;
+    private string? _whatsApp;
     private readonly PlaceOrderRequest _request = new();
 
     protected override async Task OnInitializedAsync()
@@ -99,7 +101,9 @@ else
         _methods = await CustomerOrders.GetAvailablePaymentMethodsAsync();
         if (_methods.Count > 0)
             _request.PaymentMethod = _methods[0];
-        _pickupAddress = (await CustomerOrders.GetPaymentInstructionsAsync(_request.PaymentMethod)).PickupAddress;
+        var store = await CustomerOrders.GetPaymentInstructionsAsync(_request.PaymentMethod);
+        _pickupAddress = store.PickupAddress;
+        _whatsApp = store.WhatsAppNumber;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

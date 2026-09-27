@@ -1,0 +1,45 @@
+@* Aviso con el WhatsApp de la tienda para confirmar el pago. Si hay número de pedido, el mensaje va precargado. *@
+@if (Link is not null)
+{
+    <MudAlert Severity="Severity.Success" Icon="@WhatsAppIcon" Class="@Class" data-testid="whatsapp-contact">
+        <MudStack Spacing="1">
+            <MudText Typo="Typo.body2">
+                Para confirmar tu pago también puedes escribirnos por WhatsApp al
+                <b data-testid="whatsapp-number">@Number</b>@(OrderNumber is null ? "" : " indicando tu número de pedido")
+                @if (OrderNumber is not null)
+                {
+                    <b> #@OrderNumber</b>
+                }.
+            </MudText>
+            @if (ShowButton)
+            {
+                <div>
+                    <MudButton Href="@Link" Target="_blank" Rel="noopener noreferrer" Variant="Variant.Filled"
+                               Style="background:#25D366;color:#fff" StartIcon="@WhatsAppIcon" Size="Size.Small"
+                               data-testid="whatsapp-button">
+                        Escribir por WhatsApp
+                    </MudButton>
+                </div>
+            }
+        </MudStack>
+    </MudAlert>
+}
+
+@code {
+    private const string WhatsAppIcon = Icons.Custom.Brands.WhatsApp;
+
+    [Parameter] public string? Number { get; set; }
+    [Parameter] public string? OrderNumber { get; set; }
+    [Parameter] public decimal? Total { get; set; }
+    [Parameter] public string Currency { get; set; } = "DOP";
+    [Parameter] public bool ShowButton { get; set; } = true;
+    [Parameter] public string? Class { get; set; }
+
+    private string? Link => WhatsApp.ChatLink(Number, Message);
+
+    private string Message => OrderNumber is null
+        ? "Hola, quiero confirmar el pago de mi pedido."
+        : $"Hola, quiero confirmar el pago del pedido #{OrderNumber}" +
+          (Total is { } t ? $" por {Ui.Money(t, Currency)}." : ".") +
+          " Adjunto el comprobante.";
+}

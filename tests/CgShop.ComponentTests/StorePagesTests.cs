@@ -66,6 +66,7 @@ public sealed class StorePagesTests : StoreTestContext
         cut.WaitForAssertion(() => cut.Find("[data-testid='payment-instructions']"));
         cut.Markup.Should().Contain("Banco Popular").And.Contain("800-1").And.Contain(order.Number);
         cut.Find("[data-testid='upload-receipt']");
+        cut.Find("[data-testid='whatsapp-button']").GetAttribute("href").Should().StartWith("https://wa.me/18095551234");
         cut.Markup.Should().Contain(OrderStatus.PendingPaymentValidation.DisplayName());
     }
 

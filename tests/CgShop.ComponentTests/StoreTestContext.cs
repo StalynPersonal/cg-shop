@@ -42,7 +42,9 @@ public abstract class StoreTestContext : MudTestContext
         Tenant.UpdatePaymentSettings(new PaymentSettings
         {
             BankAccounts = [new BankAccount { BankName = "Banco Popular", AccountNumber = "800-1", AccountHolder = "Verde SRL" }],
-            PaymentLinkUrl = "https://pagos.test/verde"
+            PaymentLinkUrl = "https://pagos.test/verde",
+            WhatsAppNumber = "809-555-1234",
+            PickupAddress = "Av. Lincoln 100"
         });
         TenantInfo = TenantInfo.From(Tenant);
         TenantContext.SetTenant(TenantInfo);

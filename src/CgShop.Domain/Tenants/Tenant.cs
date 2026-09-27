@@ -93,6 +93,9 @@ public sealed partial class Tenant : Entity
             (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || uri.Scheme != Uri.UriSchemeHttps))
             throw new DomainException("El enlace de pago debe ser una URL https válida.");
 
+        if (!string.IsNullOrWhiteSpace(settings.WhatsAppNumber) && !WhatsApp.IsValid(settings.WhatsAppNumber))
+            throw new DomainException("El número de WhatsApp no es válido (use código de país, ej. +1 809 555 1234).");
+
         foreach (var account in settings.BankAccounts)
         {
             if (string.IsNullOrWhiteSpace(account.BankName) || string.IsNullOrWhiteSpace(account.AccountNumber) ||

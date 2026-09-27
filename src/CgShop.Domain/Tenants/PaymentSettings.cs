@@ -9,6 +9,9 @@ public sealed class PaymentSettings
     /// <summary>Dirección donde el cliente retira su pedido (opción "Retiro en tienda").</summary>
     public string? PickupAddress { get; set; }
 
+    /// <summary>WhatsApp de la tienda para que el cliente confirme su pago.</summary>
+    public string? WhatsAppNumber { get; set; }
+
     public bool AcceptsBankTransfer => BankAccounts.Count > 0;
     public bool AcceptsPaymentLink => !string.IsNullOrWhiteSpace(PaymentLinkUrl);
 }

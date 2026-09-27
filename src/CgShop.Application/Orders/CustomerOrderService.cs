@@ -39,7 +39,8 @@ public sealed class CustomerOrderService(
             method == PaymentMethod.BankTransfer ? ps.BankAccounts : [],
             method == PaymentMethod.PaymentLink ? ps.PaymentLinkUrl : null,
             ps.Instructions,
-            ps.PickupAddress);
+            ps.PickupAddress,
+            ps.WhatsAppNumber);
     }
 
     public async Task<IReadOnlyList<PaymentMethod>> GetAvailablePaymentMethodsAsync(CancellationToken ct = default)

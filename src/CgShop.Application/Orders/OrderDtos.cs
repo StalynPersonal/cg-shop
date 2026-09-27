@@ -76,7 +76,8 @@ public sealed record PaymentInstructionsDto(
     IReadOnlyList<BankAccount> BankAccounts,
     string? PaymentLinkUrl,
     string? Instructions,
-    string? PickupAddress);
+    string? PickupAddress,
+    string? WhatsAppNumber);
 
 public sealed record OrderQuery(OrderStatus? Status = null, string? Search = null, int Page = 1, int PageSize = 25);
 

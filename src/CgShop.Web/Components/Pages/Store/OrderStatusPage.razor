@@ -59,6 +59,8 @@ else
                     {
                         <MudAlert Severity="Severity.Info" Class="mt-3" Dense="true">@_instructions.Instructions</MudAlert>
                     }
+                    <WhatsAppContact Number="@_instructions.WhatsAppNumber" OrderNumber="@_order.Number"
+                                     Total="_order.Total" Currency="@_order.Currency" Class="mt-3" />
                 </MudPaper>
 
                 <MudPaper Class="pa-6 mb-4" Outlined="true">
