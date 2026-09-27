@@ -9,7 +9,7 @@
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap" Class="mb-4">
     <MudStack Spacing="0">
         <MudText Typo="Typo.h4">Mi cuenta</MudText>
-        <MudText Color="Color.Secondary" data-testid="account-name">@_name · @_email @(_phone is null ? "" : $"· {_phone}")</MudText>
+        <MudText Class="mud-text-secondary" data-testid="account-name">@_name · @_email @(_phone is null ? "" : $"· {_phone}")</MudText>
     </MudStack>
     <MudButton Href="/catalogo" Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Storefront">
         Seguir comprando

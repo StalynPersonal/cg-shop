@@ -1,11 +1,11 @@
-<MudItem xs="12" sm="6" md="@Md" Style="flex-grow:1">
-    <MudPaper Class="pa-4 d-flex align-center gap-3" Elevation="1" Style="@(Href is null ? "" : "cursor:pointer")"
+<MudItem xs="6" sm="6" md="@Md" Style="flex-grow:1">
+    <MudPaper Class="pa-3 pa-sm-4 d-flex align-center gap-3 cg-stat" Elevation="1" Style="@(Href is null ? "" : "cursor:pointer")"
               @onclick="Navigate">
         <MudAvatar Color="@Color" Variant="Variant.Filled">
             <MudIcon Icon="@Icon" />
         </MudAvatar>
         <div>
-            <MudText Typo="Typo.caption" Color="Color.Secondary">@Title</MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@Title</MudText>
             <MudText Typo="Typo.h5" data-testid="stat-value">@Value</MudText>
         </div>
     </MudPaper>

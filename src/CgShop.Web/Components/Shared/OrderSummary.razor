@@ -11,7 +11,7 @@
         {
             <MudStack Row="true" Justify="Justify.SpaceBetween" data-testid="summary-delivery">
                 <MudText>@(delivery == DeliveryMethod.Shipping ? "Envío" : "Retiro en tienda")</MudText>
-                <MudText Color="Color.Secondary">@(delivery == DeliveryMethod.Shipping ? "A coordinar según zona" : "Sin costo")</MudText>
+                <MudText Class="mud-text-secondary">@(delivery == DeliveryMethod.Shipping ? "A coordinar según zona" : "Sin costo")</MudText>
             </MudStack>
         }
         <MudDivider Class="my-2" />

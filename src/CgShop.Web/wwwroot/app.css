@@ -56,6 +56,67 @@ html, body {
     color: var(--mud-palette-primary);
 }
 
+/* ===== Responsive ===== */
+
+/* Barra de filtros de MudDataGrid: altura automática para que los filtros bajen de línea
+   en pantallas pequeñas (por defecto tiene altura fija y se superpone a las filas). */
+.mud-table-toolbar {
+    height: auto !important;
+    min-height: 64px;
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* Título de la barra superior: una sola línea con "…" si no cabe. */
+.cg-appbar-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Botones de acción que deben apilarse ordenadamente en celular */
+.cg-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+@media (max-width: 599.98px) {
+    .mud-container {
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+    }
+
+    .mud-typography-h3 { font-size: 2rem; }
+    .mud-typography-h4 { font-size: 1.6rem; }
+    .mud-typography-h5 { font-size: 1.25rem; }
+
+    .cg-product-image { height: 120px; }
+    .cg-product-card .mud-card-content { padding: 10px; }
+    .cg-product-card .mud-card-actions { padding: 0 10px 10px; }
+    .cg-product-card .mud-typography-h6 { font-size: 1rem; }
+    .cg-product-card .mud-typography-subtitle1 { font-size: .9rem; line-height: 1.3; }
+
+    .cg-hero { padding: 20px !important; }
+    .cg-form-card { padding: 20px !important; }
+
+    .cg-actions > .mud-button-root { flex: 1 1 auto; }
+
+    .cg-gallery-thumb { width: 56px; height: 56px; }
+
+    .cg-stat { gap: 8px !important; }
+    .cg-stat .mud-avatar { width: 36px; height: 36px; }
+    .cg-stat > div { min-width: 0; }
+    .cg-stat .mud-typography-h5 { font-size: 1.1rem; overflow-wrap: anywhere; }
+}
+
+/* Tarjetas de indicadores: el texto no empuja fuera el contenido */
+.cg-stat { height: 100%; }
+
 /* Aviso de cierre de sesión por inactividad */
 .cg-session-warning {
     position: fixed;

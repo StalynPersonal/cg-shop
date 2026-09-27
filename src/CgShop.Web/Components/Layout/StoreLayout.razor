@@ -7,10 +7,14 @@
         <SessionTimeoutGuard />
     </Authorized>
 </AuthorizeView>
-
 <MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary">
-        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="d-flex align-center gap-2">
+    <MudAppBar Elevation="1" Color="Color.Primary" Gutters="true">
+        @* Menú ☰ en celular y tablet: categorías y cuenta *@
+        <MudHidden Breakpoint="Breakpoint.LgAndUp">
+            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                           OnClick="() => _menuOpen = true" aria-label="Menú" data-testid="store-menu" />
+        </MudHidden>
+        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="d-flex align-center gap-2 cg-appbar-title">
             @if (Host.Tenant?.LogoUrl is { } logo)
             {
                 <img src="@logo" alt="@Host.Tenant.Name" style="height:36px" />
@@ -19,9 +23,9 @@
             {
                 <MudIcon Icon="@Icons.Material.Filled.Storefront" />
             }
-            <MudText Typo="Typo.h6" data-testid="store-name">@Host.Tenant?.Name</MudText>
+            <MudText Typo="Typo.h6" Class="cg-appbar-title" data-testid="store-name">@Host.Tenant?.Name</MudText>
         </MudLink>
-        <MudHidden Breakpoint="Breakpoint.SmAndDown">
+        <MudHidden Breakpoint="Breakpoint.MdAndDown">
             <MudStack Row="true" Class="ml-6" Spacing="0">
                 <MudButton Href="/catalogo" Color="Color.Inherit">Todo</MudButton>
                 @foreach (var category in Enum.GetValues<ProductCategory>())
@@ -33,30 +37,84 @@
             </MudStack>
         </MudHidden>
         <MudSpacer />
-        <AuthorizeView>
-            <Authorized>
-                @if (context.User.IsInRole(Roles.TenantAdmin) || context.User.IsInRole(Roles.TenantStaff))
-                {
-                    <MudButton Href="/admin" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Dashboard"
-                               data-testid="nav-admin">Panel</MudButton>
-                }
-                else
-                {
-                    <MudButton Href="/mi-cuenta" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AccountCircle"
-                               data-testid="nav-account">Mi cuenta</MudButton>
-                }
-                <LogoutButton />
-            </Authorized>
-            <NotAuthorized>
-                <MudButton Href="/cuenta/login" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login"
-                           data-testid="nav-login">Ingresar</MudButton>
-            </NotAuthorized>
-        </AuthorizeView>
-        <MudBadge Content="@Cart.Count" Visible="@(Cart.Count > 0)" Color="Color.Secondary" Overlap="true" Class="mx-2">
+        @* Escritorio: botones con texto. Celular: solo íconos (el resto está en el menú ☰). *@
+        <MudHidden Breakpoint="Breakpoint.Xs">
+            <AuthorizeView>
+                <Authorized>
+                    @if (IsStaff(context.User))
+                    {
+                        <MudButton Href="/admin" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Dashboard"
+                                   data-testid="nav-admin">Panel</MudButton>
+                    }
+                    else
+                    {
+                        <MudButton Href="/mi-cuenta" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AccountCircle"
+                                   data-testid="nav-account">Mi cuenta</MudButton>
+                    }
+                    <LogoutButton />
+                </Authorized>
+                <NotAuthorized>
+                    <MudButton Href="/cuenta/login" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login"
+                               data-testid="nav-login">Ingresar</MudButton>
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudHidden>
+        <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
+            <AuthorizeView>
+                <Authorized>
+                    <MudIconButton Href="@(IsStaff(context.User) ? "/admin" : "/mi-cuenta")" Color="Color.Inherit"
+                                   Icon="@(IsStaff(context.User) ? Icons.Material.Filled.Dashboard : Icons.Material.Filled.AccountCircle)"
+                                   aria-label="Mi cuenta" />
+                </Authorized>
+                <NotAuthorized>
+                    <MudIconButton Href="/cuenta/login" Color="Color.Inherit" Icon="@Icons.Material.Filled.Login"
+                                   aria-label="Ingresar" />
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudHidden>
+        <MudBadge Content="@Cart.Count" Visible="@(Cart.Count > 0)" Color="Color.Secondary" Overlap="true" Class="ml-1">
             <MudIconButton Href="/carrito" Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit"
                            aria-label="Carrito" />
         </MudBadge>
     </MudAppBar>
+
+    <MudDrawer @bind-Open="_menuOpen" Variant="DrawerVariant.Temporary" Anchor="Anchor.Start" Elevation="2"
+               data-testid="store-drawer">
+        <MudDrawerHeader Class="mud-theme-primary">
+            <MudText Typo="Typo.h6">@Host.Tenant?.Name</MudText>
+        </MudDrawerHeader>
+        <MudNavMenu Color="Color.Primary">
+            <MudNavLink Href="/" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Home" OnClick="Close">Inicio</MudNavLink>
+            <MudNavLink Href="/catalogo" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.GridView" OnClick="Close">Todo el catálogo</MudNavLink>
+            @foreach (var category in Enum.GetValues<ProductCategory>())
+            {
+                <MudNavLink Href="@($"/catalogo/{Ui.CategorySlug(category)}")" Icon="@Ui.CategoryIcon(category)" OnClick="Close">
+                    @category.DisplayName()
+                </MudNavLink>
+            }
+            <MudDivider Class="my-2" />
+            <MudNavLink Href="/carrito" Icon="@Icons.Material.Filled.ShoppingCart" OnClick="Close">
+                Carrito @(Cart.Count > 0 ? $"({Cart.Count})" : "")
+            </MudNavLink>
+            <AuthorizeView>
+                <Authorized>
+                    @if (IsStaff(context.User))
+                    {
+                        <MudNavLink Href="/admin" Icon="@Icons.Material.Filled.Dashboard" OnClick="Close">Panel de la tienda</MudNavLink>
+                    }
+                    else
+                    {
+                        <MudNavLink Href="/mi-cuenta" Icon="@Icons.Material.Filled.AccountCircle" OnClick="Close">Mi cuenta y pedidos</MudNavLink>
+                    }
+                    <div class="px-4 py-2"><LogoutButton Color="Color.Primary" /></div>
+                </Authorized>
+                <NotAuthorized>
+                    <MudNavLink Href="/cuenta/login" Icon="@Icons.Material.Filled.Login" OnClick="Close">Ingresar</MudNavLink>
+                    <MudNavLink Href="/cuenta/registro" Icon="@Icons.Material.Filled.PersonAdd" OnClick="Close">Crear cuenta</MudNavLink>
+                </NotAuthorized>
+            </AuthorizeView>
+        </MudNavMenu>
+    </MudDrawer>
 
     <MudMainContent Class="cg-sticky-footer-layout">
         <MudContainer MaxWidth="MaxWidth.Large" Class="py-6 cg-main-grow">
@@ -72,6 +130,12 @@
 
 @code {
     [CascadingParameter] private HostContext Host { get; set; } = default!;
+    private bool _menuOpen;
+
+    private static bool IsStaff(System.Security.Claims.ClaimsPrincipal user) =>
+        user.IsInRole(Roles.TenantAdmin) || user.IsInRole(Roles.TenantStaff);
+
+    private void Close() => _menuOpen = false;
 
     protected override void OnInitialized() => Cart.Changed += OnCartChanged;
 

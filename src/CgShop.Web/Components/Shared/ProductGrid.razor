@@ -5,10 +5,10 @@
 }
 else
 {
-    <MudGrid Spacing="3">
+    <MudGrid Spacing="2">
         @foreach (var product in Products)
         {
-            <MudItem xs="12" sm="6" md="4" lg="3">
+            <MudItem xs="6" sm="4" md="4" lg="3">
                 <MudCard Class="cg-product-card" Elevation="2" data-testid="product-card">
                     <a href="@($"/producto/{product.Slug}")" style="text-decoration:none">
                         @if (product.ImageUrl is not null)
@@ -23,7 +23,7 @@ else
                         }
                     </a>
                     <MudCardContent Style="flex-grow:1">
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@product.Brand · @product.Category.DisplayName()</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@product.Brand · @product.Category.DisplayName()</MudText>
                         <MudLink Href="@($"/producto/{product.Slug}")" Color="Color.Default" Underline="Underline.Hover">
                             <MudText Typo="Typo.subtitle1"><b>@product.Name</b></MudText>
                         </MudLink>
@@ -33,7 +33,7 @@ else
                         @if (product.Available > 0)
                         {
                             <MudButton Href="@($"/producto/{product.Slug}")" Variant="Variant.Filled" Color="Color.Primary"
-                                       FullWidth="true" StartIcon="@Icons.Material.Filled.AddShoppingCart">Ver opciones</MudButton>
+                                       FullWidth="true">Ver opciones</MudButton>
                         }
                         else
                         {

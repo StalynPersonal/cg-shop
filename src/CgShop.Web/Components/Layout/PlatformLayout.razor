@@ -9,21 +9,32 @@
 <MudLayout>
     <MudAppBar Elevation="1" Color="Color.Primary">
         <MudIcon Icon="@Icons.Material.Filled.Hub" Class="mr-2" />
-        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None">
-            <MudText Typo="Typo.h6">CG Shop @(Host.IsAdmin ? "· Super Admin" : "")</MudText>
+        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="cg-appbar-title">
+            <MudText Typo="Typo.h6" Class="cg-appbar-title">CG Shop @(Host.IsAdmin ? "· Super Admin" : "")</MudText>
         </MudLink>
         @if (Host.IsAdmin)
         {
             <AuthorizeView Policy="@Policies.SuperAdmin">
-                <MudButton Href="/" Color="Color.Inherit" Class="ml-6">Empresas</MudButton>
-                <MudButton Href="/empresas/nueva" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AddBusiness">Nueva empresa</MudButton>
+                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                    <MudButton Href="/" Color="Color.Inherit" Class="ml-6">Empresas</MudButton>
+                    <MudButton Href="/empresas/nueva" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AddBusiness">Nueva empresa</MudButton>
+                </MudHidden>
+                <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
+                    <MudIconButton Href="/empresas/nueva" Color="Color.Inherit" Icon="@Icons.Material.Filled.AddBusiness"
+                                   aria-label="Nueva empresa" />
+                </MudHidden>
             </AuthorizeView>
         }
         <MudSpacer />
         <AuthorizeView>
             <Authorized>
-                <MudText Typo="Typo.body2" Class="mr-2">@context.User.FindFirst(CgClaimTypes.FullName)?.Value</MudText>
-                <LogoutButton />
+                <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                    <MudText Typo="Typo.body2" Class="mr-2">@context.User.FindFirst(CgClaimTypes.FullName)?.Value</MudText>
+                    <LogoutButton />
+                </MudHidden>
+                <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
+                    <LogoutButton IconOnly="true" />
+                </MudHidden>
             </Authorized>
         </AuthorizeView>
     </MudAppBar>

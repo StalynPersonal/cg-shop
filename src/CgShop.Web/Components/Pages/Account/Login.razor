@@ -4,7 +4,7 @@
 
 <MudGrid Justify="Justify.Center" Class="mt-6">
     <MudItem xs="12" sm="8" md="5">
-        <MudPaper Class="pa-8" Elevation="3">
+        <MudPaper Class="pa-8 cg-form-card" Elevation="3">
             <MudStack Spacing="3">
                 <MudText Typo="Typo.h5">
                     @(Host.IsAdmin ? "Acceso Super Admin" : $"Iniciar sesión en {Host.Tenant?.Name}")

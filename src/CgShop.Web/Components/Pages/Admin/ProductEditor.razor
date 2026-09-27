@@ -33,7 +33,7 @@ else
                         <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen externa (opcional, si no sube fotos)" Variant="Variant.Outlined" />
 
                         <MudText Typo="Typo.subtitle1" Class="mt-2">Atributos de @_product.Category.DisplayName()</MudText>
-                        <MudText Typo="Typo.caption" Color="Color.Secondary">@AttributeHint</MudText>
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary">@AttributeHint</MudText>
                         @foreach (var key in _product.Attributes.Keys.ToList())
                         {
                             <MudStack Row="true" AlignItems="AlignItems.Center">
@@ -59,7 +59,7 @@ else
         <MudItem xs="12" md="6">
             <MudPaper Class="pa-6" Outlined="true">
                 <MudText Typo="Typo.h6">Variantes</MudText>
-                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary">
                     Cada combinación de @DimensionsText es un SKU con su propio precio y stock.
                 </MudText>
                 <MudSimpleTable Dense="true" Class="my-3">

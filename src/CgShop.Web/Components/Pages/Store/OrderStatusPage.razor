@@ -65,7 +65,7 @@ else
 
                 <MudPaper Class="pa-6 mb-4" Outlined="true">
                     <MudText Typo="Typo.h6">Sube tu comprobante (opcional)</MudText>
-                    <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mb-3">
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mb-3">
                         JPG, PNG o PDF de hasta @(Options.Value.MaxReceiptBytes / 1024 / 1024) MB. Agiliza la validación de tu pago.
                     </MudText>
                     <MudTextField @bind-Value="_reference" Label="Referencia de la transacción (opcional)"
@@ -129,7 +129,7 @@ else
                     <MudText Typo="Typo.h6">Total</MudText>
                     <MudText Typo="Typo.h6" Color="Color.Primary">@Ui.Money(_order.Total, _order.Currency)</MudText>
                 </MudStack>
-                <MudText Typo="Typo.caption" Color="Color.Secondary" Class="mt-2 d-block">
+                <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2 d-block">
                     Guarda este enlace para consultar tu pedido.
                 </MudText>
             </MudPaper>

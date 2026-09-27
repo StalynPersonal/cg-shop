@@ -3,7 +3,7 @@
 
 <PageTitle>Pagos por validar · @Host.Tenant?.Name</PageTitle>
 <MudText Typo="Typo.h4">Pagos por validar</MudText>
-<MudText Color="Color.Secondary" Class="mb-4">
+<MudText Class="mud-text-secondary mb-4">
     Las órdenes no se procesan ni se despachan hasta que el propietario confirme el pago revisando el comprobante
     o su cuenta bancaria. El stock está apartado hasta la fecha límite.
 </MudText>
@@ -39,18 +39,19 @@ else
                         <MudText Typo="Typo.h5" Color="Color.Primary">@Ui.Money(order.Total, Currency)</MudText>
                         <MudText Typo="Typo.body2">@order.PaymentMethod.DisplayName() · @order.ItemCount artículo(s)</MudText>
                         <MudText Typo="Typo.body2">@order.DeliveryMethod.DisplayName()</MudText>
-                        <MudText Typo="Typo.caption" Color="@(order.ReservationExpiresAtUtc < DateTime.UtcNow.AddHours(6) ? Color.Error : Color.Secondary)">
+                        <MudText Typo="Typo.caption" Color="@(order.ReservationExpiresAtUtc < DateTime.UtcNow.AddHours(6) ? Color.Error : Color.Default)">
                             Creado @Ui.Date(order.CreatedAtUtc) · Reserva hasta @Ui.Date(order.ReservationExpiresAtUtc)
                         </MudText>
                     </MudCardContent>
-                    <MudCardActions>
-                        <MudButton Href="@($"/admin/pedidos/{order.Id}")" Variant="Variant.Text">Ver detalle</MudButton>
-                        <MudSpacer />
+                    <MudCardActions Class="cg-actions">
                         <AuthorizeView Policy="@Policies.TenantAdmin">
-                            <MudButton Color="Color.Error" OnClick="() => Reject(order)">Rechazar</MudButton>
                             <MudButton Color="Color.Success" Variant="Variant.Filled" StartIcon="@Icons.Material.Filled.Verified"
-                                       OnClick="() => Validate(order)" data-testid="validate-payment">Validar pago</MudButton>
+                                       OnClick="() => Validate(order)" data-testid="validate-payment" Style="flex:1 1 100%">
+                                Validar pago
+                            </MudButton>
+                            <MudButton Color="Color.Error" Variant="Variant.Outlined" OnClick="() => Reject(order)">Rechazar</MudButton>
                         </AuthorizeView>
+                        <MudButton Href="@($"/admin/pedidos/{order.Id}")" Variant="Variant.Text">Ver detalle</MudButton>
                     </MudCardActions>
                 </MudCard>
             </MudItem>

@@ -5,10 +5,10 @@
 
 <MudGrid Justify="Justify.Center" Class="mt-6">
     <MudItem xs="12" sm="8" md="6">
-        <MudPaper Class="pa-8" Elevation="3">
+        <MudPaper Class="pa-8 cg-form-card" Elevation="3">
             <MudStack Spacing="3">
                 <MudText Typo="Typo.h5">Crear cuenta en @Host.Tenant?.Name</MudText>
-                <MudText Typo="Typo.body2" Color="Color.Secondary">
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">
                     Con tu cuenta puedes comprar y consultar el estado de tus pedidos en cualquier momento.
                 </MudText>
                 @if (Error is not null)
