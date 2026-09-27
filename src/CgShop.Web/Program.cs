@@ -76,6 +76,7 @@ app.UseAntiforgery();
 
 app.MapAccountEndpoints();
 app.MapReceiptEndpoints();
+app.MapProductImageEndpoints();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

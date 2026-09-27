@@ -81,7 +81,7 @@ public class CatalogServiceTests : IAsyncLifetime
         nike.Items.Should().OnlyContain(p => p.Brand == "Nike");
         nike.TotalCount.Should().Be(10);
 
-        var admin = new ProductAdminService(_factory, _factory.Context, TimeProvider.System, NullLogger<ProductAdminService>.Instance);
+        var admin = new ProductAdminService(_factory, _factory.Context, NSubstitute.Substitute.For<IFileStorage>(), TimeProvider.System, NullLogger<ProductAdminService>.Instance);
         foreach (var p in nike.Items)
             await admin.SetActiveAsync(p.Id, false, TestData.TenantStaff);
 
@@ -123,7 +123,7 @@ public class ProductAdminServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _factory = _db.For(await _db.AddTenantAsync());
-        _service = new ProductAdminService(_factory, _factory.Context, TimeProvider.System, NullLogger<ProductAdminService>.Instance);
+        _service = new ProductAdminService(_factory, _factory.Context, NSubstitute.Substitute.For<IFileStorage>(), TimeProvider.System, NullLogger<ProductAdminService>.Instance);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;

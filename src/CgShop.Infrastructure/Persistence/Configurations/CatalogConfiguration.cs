@@ -40,8 +40,25 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
             .OnDelete(DeleteBehavior.Cascade);
         b.Navigation(p => p.Variants).UsePropertyAccessMode(PropertyAccessMode.Field);
 
+        b.HasMany(p => p.Images).WithOne().HasForeignKey(i => i.ProductId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(p => p.Images).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Ignore(p => p.MainImage);
+
         b.Ignore(p => p.MinPrice);
         b.Ignore(p => p.TotalAvailable);
+    }
+}
+
+internal sealed class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
+{
+    public void Configure(EntityTypeBuilder<ProductImage> b)
+    {
+        b.ToTable("ProductImages");
+        b.HasKey(i => i.Id);
+        b.Property(i => i.StoragePath).HasMaxLength(500).IsRequired();
+        b.Property(i => i.ContentType).HasMaxLength(50).IsRequired();
+        b.Property(i => i.OriginalFileName).HasMaxLength(260).IsRequired();
+        b.HasIndex(i => new { i.ProductId, i.SortOrder });
     }
 }
 

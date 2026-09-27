@@ -67,7 +67,19 @@ public static class StoreEndpoints
         store.MapGet("/catalog/{slug}", async (string slug, CatalogService catalog, CancellationToken ct) =>
             await catalog.GetBySlugAsync(slug, ct) is { } product ? Results.Ok(product) : Results.NotFound());
 
-        store.MapGet("/payment-methods", (CustomerOrderService orders, CancellationToken ct) =>
+        app.MapGet("/imagenes/{id:guid}", async (Guid id, ProductImageService images, ITenantContext tenant,
+            HttpContext http, CancellationToken ct) =>
+        {
+            if (!tenant.HasTenant)
+                return Results.NotFound();
+            var file = await images.OpenAsync(id, ct);
+            if (file is null)
+                return Results.NotFound();
+            http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(file.Value.Content, file.Value.ContentType);
+        }).WithTags("Tienda");
+
+        store.MapGet("/payment-methods",(CustomerOrderService orders, CancellationToken ct) =>
             orders.GetAvailablePaymentMethodsAsync(ct));
 
         // Comprar requiere cliente autenticado: el pedido queda asociado al usuario del token.
@@ -184,6 +196,36 @@ public static class AdminEndpoints
         {
             var id = await products.CreateAsync(body.Product, body.Variants, http.User.ToActor(), ct);
             return Results.Created($"/api/admin/products/{id}", new { id });
+        });
+
+        admin.MapGet("/products/{id:guid}/images", (Guid id, ProductImageService images, CancellationToken ct) =>
+            images.ListAsync(id, ct));
+
+        admin.MapPost("/products/{id:guid}/images", async (Guid id, IFormFileCollection files,
+            ProductImageService images, HttpContext http, CancellationToken ct) =>
+        {
+            var uploaded = new List<ProductImageDto>();
+            foreach (var file in files)
+            {
+                await using var stream = file.OpenReadStream();
+                uploaded.Add(await images.UploadAsync(id, file.FileName, stream, file.Length, http.User.ToActor(), ct));
+            }
+
+            return Results.Created($"/api/admin/products/{id}/images", uploaded);
+        }).DisableAntiforgery();
+
+        admin.MapPost("/products/{id:guid}/images/{imageId:guid}/main", async (Guid id, Guid imageId,
+            ProductImageService images, HttpContext http, CancellationToken ct) =>
+        {
+            await images.SetMainAsync(id, imageId, http.User.ToActor(), ct);
+            return Results.NoContent();
+        });
+
+        admin.MapDelete("/products/{id:guid}/images/{imageId:guid}", async (Guid id, Guid imageId,
+            ProductImageService images, HttpContext http, CancellationToken ct) =>
+        {
+            await images.DeleteAsync(id, imageId, http.User.ToActor(), ct);
+            return Results.NoContent();
         });
 
         admin.MapGet("/inventory", (ProductAdminService products, string? search, int? maxAvailable, CancellationToken ct) =>

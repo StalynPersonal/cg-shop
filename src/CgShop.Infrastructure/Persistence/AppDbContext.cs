@@ -40,6 +40,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<PaymentReceipt> PaymentReceipts => Set<PaymentReceipt>();
     public DbSet<StockReservation> StockReservations => Set<StockReservation>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<ProductImage> ProductImages => Set<ProductImage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

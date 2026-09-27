@@ -65,6 +65,7 @@ public abstract class StoreTestContext : MudTestContext
         Services.AddSingleton(Substitute.For<INotificationService>());
         Services.AddSingleton(Substitute.For<ITenantStore>());
         Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new OrderOptions()));
+        Services.AddSingleton(Microsoft.Extensions.Options.Options.Create(new CgShop.Application.Catalog.CatalogOptions()));
         Services.AddDataProtection();
         Services.AddScoped<Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedLocalStorage>();
         Services.AddScoped<CartState>();

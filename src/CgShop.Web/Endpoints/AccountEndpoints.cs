@@ -114,6 +114,28 @@ public static class LoginRedirect
         !string.IsNullOrEmpty(url) && url[0] == '/' && (url.Length == 1 || (url[1] != '/' && url[1] != '\\'));
 }
 
+public static class ProductImageEndpoints
+{
+    /// <summary>Fotos públicas de productos de la tienda activa (el tenant lo resuelve el subdominio).</summary>
+    public static IEndpointRouteBuilder MapProductImageEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/imagenes/{id:guid}", async (Guid id, CgShop.Application.Catalog.ProductImageService images,
+            ITenantContext tenant, HttpContext http) =>
+        {
+            if (!tenant.HasTenant)
+                return Results.NotFound();
+            var file = await images.OpenAsync(id, http.RequestAborted);
+            if (file is null)
+                return Results.NotFound();
+            http.Response.Headers.XContentTypeOptions = "nosniff";
+            // El archivo nunca cambia (nombre único por foto): caché larga en navegador/CDN.
+            http.Response.Headers.CacheControl = "public, max-age=31536000, immutable";
+            return Results.File(file.Value.Content, file.Value.ContentType);
+        });
+        return app;
+    }
+}
+
 public static class ReceiptEndpoints
 {
     /// <summary>Descarga/visualización de comprobantes: solo personal de la tienda dueña de la orden.</summary>

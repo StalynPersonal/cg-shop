@@ -30,7 +30,7 @@ else
                         </MudSelect>
                         <MudTextField @bind-Value="_product.Brand" Label="Marca" Variant="Variant.Outlined" MaxLength="100" />
                         <MudTextField @bind-Value="_product.Description" Label="Descripción" Lines="4" Variant="Variant.Outlined" MaxLength="4000" />
-                        <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen" Variant="Variant.Outlined" />
+                        <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen externa (opcional, si no sube fotos)" Variant="Variant.Outlined" />
 
                         <MudText Typo="Typo.subtitle1" Class="mt-2">Atributos de @_product.Category.DisplayName()</MudText>
                         <MudText Typo="Typo.caption" Color="Color.Secondary">@AttributeHint</MudText>
@@ -116,6 +116,15 @@ else
             </MudPaper>
         </MudItem>
     </MudGrid>
+
+    @if (IsNew)
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">Guarde el producto para poder agregar sus fotos.</MudAlert>
+    }
+    else
+    {
+        <ProductGalleryEditor ProductId="Id!.Value" />
+    }
 }
 
 @code {

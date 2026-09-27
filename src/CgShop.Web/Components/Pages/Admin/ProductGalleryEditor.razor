@@ -1,0 +1,143 @@
+@* Galería de fotos de un producto: subida múltiple validada, foto principal, orden y eliminación. *@
+@inject ProductImageService Images
+@inject IOptions<CatalogOptions> CatalogOptions
+@using Microsoft.Extensions.Options
+
+<MudPaper Class="pa-6 mt-4" Outlined="true" data-testid="gallery-editor">
+    <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
+        <MudStack Spacing="0">
+            <MudText Typo="Typo.h6">Fotos (@_images.Count/@Opts.MaxImagesPerProduct)</MudText>
+            <MudText Typo="Typo.caption" Color="Color.Secondary">
+                JPG, PNG o WebP · máximo @MaxMb MB por foto · mínimo @(Opts.MinImageDimension)×@(Opts.MinImageDimension) px.
+                La primera foto es la principal.
+            </MudText>
+        </MudStack>
+        <MudFileUpload T="IReadOnlyList<IBrowserFile>" Accept="@ProductImageValidator.AcceptAttribute"
+                       FilesChanged="UploadAsync" MaximumFileCount="@Math.Max(1, Remaining)" Disabled="@(_uploading || Remaining == 0)">
+            <CustomContent>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.AddPhotoAlternate"
+                           OnClick="@context.OpenFilePickerAsync" Disabled="@(_uploading || Remaining == 0)"
+                           data-testid="upload-photos">
+                    @(_uploading ? "Subiendo..." : "Agregar fotos")
+                </MudButton>
+            </CustomContent>
+        </MudFileUpload>
+    </MudStack>
+
+    @if (_uploading)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="my-2" />
+    }
+
+    @if (_images.Count == 0)
+    {
+        <MudText Color="Color.Secondary" Class="mt-4">Este producto aún no tiene fotos.</MudText>
+    }
+    else
+    {
+        <MudGrid Spacing="2" Class="mt-2">
+            @foreach (var (image, index) in _images.Select((img, i) => (img, i)))
+            {
+                <MudItem xs="6" sm="4" md="3">
+                    <MudCard Outlined="true" data-testid="gallery-item">
+                        <MudCardMedia Image="@image.Url" Height="140" />
+                        <MudCardContent Class="pa-2">
+                            @if (image.IsMain)
+                            {
+                                <MudChip T="string" Size="Size.Small" Color="Color.Primary" Icon="@Icons.Material.Filled.Star"
+                                         data-testid="main-photo">Principal</MudChip>
+                            }
+                            <MudText Typo="Typo.caption" Class="d-block">
+                                @image.Width×@image.Height px · @Ui.FileSize(image.SizeBytes)
+                            </MudText>
+                        </MudCardContent>
+                        <MudCardActions Class="pa-1 justify-space-between">
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" Disabled="@(index == 0)"
+                                           OnClick="() => MoveAsync(image, -1)" aria-label="Mover a la izquierda" />
+                            @if (!image.IsMain)
+                            {
+                                <MudTooltip Text="Usar como principal">
+                                    <MudIconButton Icon="@Icons.Material.Filled.StarBorder" Size="Size.Small"
+                                                   OnClick="() => SetMainAsync(image)" aria-label="Usar como principal" />
+                                </MudTooltip>
+                            }
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
+                                           OnClick="() => DeleteAsync(image)" aria-label="Eliminar foto" />
+                            <MudIconButton Icon="@Icons.Material.Filled.ChevronRight" Size="Size.Small"
+                                           Disabled="@(index == _images.Count - 1)"
+                                           OnClick="() => MoveAsync(image, 1)" aria-label="Mover a la derecha" />
+                        </MudCardActions>
+                    </MudCard>
+                </MudItem>
+            }
+        </MudGrid>
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public Guid ProductId { get; set; }
+
+    private IReadOnlyList<ProductImageDto> _images = [];
+    private bool _uploading;
+
+    private CatalogOptions Opts => CatalogOptions.Value;
+    private int Remaining => Math.Max(0, Opts.MaxImagesPerProduct - _images.Count);
+    private string MaxMb => (Opts.MaxImageBytes / 1024d / 1024d).ToString("0.#");
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync() => _images = await Images.ListAsync(ProductId);
+
+    private async Task UploadAsync(IReadOnlyList<IBrowserFile>? files)
+    {
+        if (files is null || files.Count == 0)
+            return;
+
+        _uploading = true;
+        var uploaded = 0;
+        foreach (var file in files.Take(Remaining))
+        {
+            // Prevalidación rápida en el cliente; el servidor vuelve a validar formato real, tamaño y dimensiones.
+            if (file.Size > Opts.MaxImageBytes)
+            {
+                Snackbar.Add($"'{file.Name}' supera el máximo de {MaxMb} MB.", Severity.Warning);
+                continue;
+            }
+
+            var ok = await Snackbar.TryAsync(async () =>
+            {
+                await using var stream = file.OpenReadStream(Opts.MaxImageBytes);
+                await Images.UploadAsync(ProductId, file.Name, stream, file.Size, Actor);
+            });
+            if (ok) uploaded++;
+        }
+
+        if (files.Count > Remaining)
+            Snackbar.Add($"Solo se permiten {Opts.MaxImagesPerProduct} fotos por producto.", Severity.Warning);
+        if (uploaded > 0)
+            Snackbar.Add($"{uploaded} foto(s) agregada(s).", Severity.Success);
+
+        _uploading = false;
+        await LoadAsync();
+    }
+
+    private async Task SetMainAsync(ProductImageDto image)
+    {
+        if (await Snackbar.TryAsync(() => Images.SetMainAsync(ProductId, image.Id, Actor), "Foto principal actualizada."))
+            await LoadAsync();
+    }
+
+    private async Task MoveAsync(ProductImageDto image, int offset)
+    {
+        if (await Snackbar.TryAsync(() => Images.MoveAsync(ProductId, image.Id, offset, Actor)))
+            await LoadAsync();
+    }
+
+    private async Task DeleteAsync(ProductImageDto image)
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Eliminar foto", "¿Eliminar esta foto del producto?",
+            "Eliminar", cancelText: "Cancelar");
+        if (confirmed == true && await Snackbar.TryAsync(() => Images.DeleteAsync(ProductId, image.Id, Actor), "Foto eliminada."))
+            await LoadAsync();
+    }
+}

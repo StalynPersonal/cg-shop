@@ -18,16 +18,8 @@ else
     <MudBreadcrumbs Items="_breadcrumbs" Class="px-0" />
     <MudGrid Spacing="6">
         <MudItem xs="12" md="6">
-            @if (_product.ImageUrl is not null)
-            {
-                <MudImage Src="@_product.ImageUrl" Alt="@_product.Name" Fluid="true" Class="rounded-lg" />
-            }
-            else
-            {
-                <div class="cg-product-image rounded-lg" style="height:380px">
-                    <MudIcon Icon="@Ui.CategoryIcon(_product.Category)" Style="font-size:8rem" />
-                </div>
-            }
+            <ProductGallery Images="_product.Images" FallbackUrl="@_product.ImageUrl" Category="_product.Category"
+                            AltText="@_product.Name" />
         </MudItem>
         <MudItem xs="12" md="6">
             <MudStack Spacing="3">

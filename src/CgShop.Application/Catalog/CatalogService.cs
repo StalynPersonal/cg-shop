@@ -36,6 +36,7 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
             p.Brand,
             p.Category,
             p.ImageUrl,
+            MainImageId = p.Images.OrderBy(i => i.SortOrder).Select(i => (Guid?)i.Id).FirstOrDefault(),
             MinPrice = p.Variants.Min(v => v.Price),
             Available = p.Variants.Sum(v => v.StockOnHand - v.StockReserved)
         });
@@ -54,10 +55,9 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         };
 
         var total = await projected.CountAsync(ct);
-        var items = await projected.Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(p => new ProductCardDto(p.Id, p.Slug, p.Name, p.Brand, p.Category, p.ImageUrl, p.MinPrice,
-                p.Available))
-            .ToListAsync(ct);
+        var rows = await projected.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
+        var items = rows.Select(p => new ProductCardDto(p.Id, p.Slug, p.Name, p.Brand, p.Category,
+            ImageUrl(p.MainImageId, p.ImageUrl), p.MinPrice, p.Available)).ToList();
 
         return new PagedResult<ProductCardDto>(items, total, page, pageSize);
     }
@@ -65,7 +65,7 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
     public async Task<ProductDetailDto?> GetBySlugAsync(string slug, CancellationToken ct = default)
     {
         await using var db = dbFactory.CreateDbContext();
-        var product = await db.Products.AsNoTracking().Include(p => p.Variants)
+        var product = await db.Products.AsNoTracking().Include(p => p.Variants).Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Slug == slug && p.IsActive, ct);
         return product is null ? null : ToDetail(product);
     }
@@ -73,7 +73,7 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
     public async Task<ProductDetailDto?> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
         await using var db = dbFactory.CreateDbContext();
-        var product = await db.Products.AsNoTracking().Include(p => p.Variants)
+        var product = await db.Products.AsNoTracking().Include(p => p.Variants).Include(p => p.Images)
             .FirstOrDefaultAsync(p => p.Id == id, ct);
         return product is null ? null : ToDetail(product);
     }
@@ -84,10 +84,10 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
     {
         await using var db = dbFactory.CreateDbContext();
         var ids = variantIds.Distinct().ToList();
-        var variants = await db.ProductVariants.AsNoTracking().Include(v => v.Product)
+        var variants = await db.ProductVariants.AsNoTracking().Include(v => v.Product).ThenInclude(p => p!.Images)
             .Where(v => ids.Contains(v.Id)).ToListAsync(ct);
         return variants.Select(v => new CartVariantDto(ToDto(v), v.ProductId, v.Product!.Name, v.Product.Slug,
-            v.Product.ImageUrl, v.Product.IsActive)).ToList();
+            ImageUrl(v.Product.MainImage?.Id, v.Product.ImageUrl), v.Product.IsActive)).ToList();
     }
 
     public async Task<CatalogFacetsDto> GetFacetsAsync(ProductCategory? category = null, CancellationToken ct = default)
@@ -121,6 +121,12 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         new(v.Id, v.Sku, v.Size, v.Color, v.VolumeMl, v.Price, v.Available, v.Description);
 
     private static ProductDetailDto ToDetail(Product p) =>
-        new(p.Id, p.Slug, p.Name, p.Brand, p.Description, p.Category, p.ImageUrl, p.Attributes,
-            p.Variants.OrderBy(v => v.VolumeMl).ThenBy(v => v.Size).ThenBy(v => v.Color).Select(ToDto).ToList());
+        new(p.Id, p.Slug, p.Name, p.Brand, p.Description, p.Category, ImageUrl(p.MainImage?.Id, p.ImageUrl),
+            p.Attributes,
+            p.Variants.OrderBy(v => v.VolumeMl).ThenBy(v => v.Size).ThenBy(v => v.Color).Select(ToDto).ToList(),
+            p.Images.Select(ProductImageService.ToDto).ToList());
+
+    /// <summary>Foto principal subida; si no hay, la URL externa opcional del producto.</summary>
+    private static string? ImageUrl(Guid? mainImageId, string? externalUrl) =>
+        mainImageId is { } id ? ProductImageService.UrlFor(id) : externalUrl;
 }

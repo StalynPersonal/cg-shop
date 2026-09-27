@@ -14,6 +14,7 @@ namespace CgShop.Application.Catalog;
 public sealed class ProductAdminService(
     IAppDbContextFactory dbFactory,
     ITenantContext tenant,
+    IFileStorage storage,
     TimeProvider clock,
     ILogger<ProductAdminService> logger)
 {
@@ -124,9 +125,15 @@ public sealed class ProductAdminService(
             foreach (var v in product.Variants.Where(v => v.StockOnHand > 0))
                 db.StockMovements.Add(new StockMovement(v, product.Name, StockMovementType.ManualAdjustment,
                     -v.StockOnHand, v.StockOnHand, actor, Now, "Producto eliminado"));
-            db.Products.Remove(product);
+            db.Products.Remove(product); // las fotos se eliminan en cascada
         }
+        var imagePaths = hasSales
+            ? []
+            : await db.ProductImages.Where(i => i.ProductId == productId).Select(i => i.StoragePath).ToListAsync(ct);
         await db.SaveChangesAsync(ct);
+
+        foreach (var path in imagePaths)
+            await storage.DeleteAsync(product.TenantId, path, CancellationToken.None);
         return !hasSales;
     }
 

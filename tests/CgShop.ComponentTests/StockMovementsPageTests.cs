@@ -12,7 +12,7 @@ public sealed class StockMovementsPageTests : StoreTestContext
     private async Task Seed100StaffAdjustmentsAsync()
     {
         await SeedProductsAsync(20);
-        var service = new ProductAdminService(new DirectFactory(this), TenantContext, Clock,
+        var service = new ProductAdminService(new DirectFactory(this), TenantContext, NSubstitute.Substitute.For<CgShop.Application.Common.IFileStorage>(), Clock,
             NullLogger<ProductAdminService>.Instance);
         var variants = (await service.GetInventoryAsync()).ToList();
         for (var i = 0; i < TestData.BatchSize; i++)

@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddApplication();
         services.Configure<TenantResolutionOptions>(configuration.GetSection(TenantResolutionOptions.Section));
         services.Configure<OrderOptions>(configuration.GetSection(OrderOptions.Section));
+        services.Configure<CgShop.Application.Catalog.CatalogOptions>(configuration.GetSection(CgShop.Application.Catalog.CatalogOptions.Section));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.Section));
 
         // Tenancy: un TenantContext por scope (petición HTTP o circuito Blazor).

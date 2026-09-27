@@ -5,6 +5,7 @@ namespace CgShop.Domain.Catalog;
 public sealed class Product : Entity, ITenantEntity
 {
     private readonly List<ProductVariant> _variants = [];
+    private readonly List<ProductImage> _images = [];
 
     private Product() { }
 
@@ -24,6 +25,59 @@ public sealed class Product : Entity, ITenantEntity
     public Dictionary<string, string> Attributes { get; private set; } = [];
 
     public IReadOnlyList<ProductVariant> Variants => _variants;
+
+    /// <summary>Fotos ordenadas; la primera es la principal.</summary>
+    public IReadOnlyList<ProductImage> Images => _images.OrderBy(i => i.SortOrder).ToList();
+
+    public ProductImage? MainImage => _images.OrderBy(i => i.SortOrder).FirstOrDefault();
+
+    public ProductImage AddImage(string storagePath, string contentType, long sizeBytes, int width, int height,
+        string originalFileName, int maxImages, DateTime nowUtc)
+    {
+        if (_images.Count >= maxImages)
+            throw new DomainException($"El producto ya tiene el máximo de {maxImages} fotos.");
+        var image = new ProductImage(Id, storagePath, contentType, sizeBytes, width, height, originalFileName,
+            _images.Count == 0 ? 0 : _images.Max(i => i.SortOrder) + 1, nowUtc) { TenantId = TenantId };
+        _images.Add(image);
+        return image;
+    }
+
+    /// <summary>Quita la foto y devuelve su ruta de almacenamiento para eliminar el archivo.</summary>
+    public ProductImage RemoveImage(Guid imageId)
+    {
+        var image = FindImage(imageId);
+        _images.Remove(image);
+        Renumber(_images.OrderBy(i => i.SortOrder));
+        return image;
+    }
+
+    public void SetMainImage(Guid imageId)
+    {
+        var image = FindImage(imageId);
+        Renumber(new[] { image }.Concat(_images.Where(i => i != image).OrderBy(i => i.SortOrder)));
+    }
+
+    /// <summary>Mueve la foto una posición hacia adelante (-1) o hacia atrás (+1).</summary>
+    public void MoveImage(Guid imageId, int offset)
+    {
+        var ordered = _images.OrderBy(i => i.SortOrder).ToList();
+        var index = ordered.IndexOf(FindImage(imageId));
+        var target = Math.Clamp(index + Math.Sign(offset), 0, ordered.Count - 1);
+        if (target == index)
+            return;
+        (ordered[index], ordered[target]) = (ordered[target], ordered[index]);
+        Renumber(ordered);
+    }
+
+    private ProductImage FindImage(Guid imageId) =>
+        _images.FirstOrDefault(i => i.Id == imageId) ?? throw new DomainException("Foto no encontrada.");
+
+    private static void Renumber(IEnumerable<ProductImage> ordered)
+    {
+        var position = 0;
+        foreach (var image in ordered.ToList())
+            image.SortOrder = position++;
+    }
 
     public decimal? MinPrice => _variants.Count == 0 ? null : _variants.Min(v => v.Price);
     public int TotalAvailable => _variants.Sum(v => v.Available);

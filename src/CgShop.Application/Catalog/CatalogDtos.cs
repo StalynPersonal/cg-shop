@@ -59,7 +59,8 @@ public sealed record ProductDetailDto(
     ProductCategory Category,
     string? ImageUrl,
     IReadOnlyDictionary<string, string> Attributes,
-    IReadOnlyList<VariantDto> Variants);
+    IReadOnlyList<VariantDto> Variants,
+    IReadOnlyList<ProductImageDto> Images);
 
 public sealed record CatalogFacetsDto(
     IReadOnlyList<ProductCategory> Categories,

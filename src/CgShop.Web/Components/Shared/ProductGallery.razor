@@ -1,0 +1,48 @@
+@* Galería de la tienda: foto grande + miniaturas. Sin fotos, muestra la URL externa o el ícono de la categoría. *@
+<div data-testid="product-gallery">
+    @if (Images.Count > 0)
+    {
+        <div class="cg-gallery-main rounded-lg">
+            <img src="@Selected.Url" alt="@AltText" data-testid="gallery-main" />
+        </div>
+        @if (Images.Count > 1)
+        {
+            <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap" Class="mt-2">
+                @foreach (var image in Images)
+                {
+                    <button type="button" class="@($"cg-gallery-thumb {(image.Id == Selected.Id ? "selected" : "")}")"
+                            @onclick="() => _selectedId = image.Id" aria-label="Ver foto" data-testid="gallery-thumb">
+                        <img src="@image.Url" alt="@AltText" loading="lazy" />
+                    </button>
+                }
+            </MudStack>
+        }
+    }
+    else if (FallbackUrl is not null)
+    {
+        <MudImage Src="@FallbackUrl" Alt="@AltText" Fluid="true" Class="rounded-lg" />
+    }
+    else
+    {
+        <div class="cg-product-image rounded-lg" style="height:380px">
+            <MudIcon Icon="@Ui.CategoryIcon(Category)" Style="font-size:8rem" />
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<ProductImageDto> Images { get; set; } = [];
+    [Parameter] public string? FallbackUrl { get; set; }
+    [Parameter] public ProductCategory Category { get; set; }
+    [Parameter] public string AltText { get; set; } = "";
+
+    private Guid? _selectedId;
+
+    private ProductImageDto Selected => Images.FirstOrDefault(i => i.Id == _selectedId) ?? Images[0];
+
+    protected override void OnParametersSet()
+    {
+        if (_selectedId is { } id && Images.All(i => i.Id != id))
+            _selectedId = null;
+    }
+}
