@@ -136,3 +136,6 @@ public sealed record InventoryRowDto(
     int StockOnHand,
     int StockReserved,
     int Available);
+
+public sealed record ProductChangeDto(Guid Id, ProductChangeType Type, string? Details, string UserName, string? UserRole,
+    DateTime AtUtc);

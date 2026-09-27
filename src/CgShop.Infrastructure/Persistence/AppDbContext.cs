@@ -42,6 +42,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ITenantContext
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<ProductImage> ProductImages => Set<ProductImage>();
     public DbSet<CgShop.Domain.Marketing.StoreBanner> StoreBanners => Set<CgShop.Domain.Marketing.StoreBanner>();
+    public DbSet<ProductChange> ProductChanges => Set<ProductChange>();
     public DbSet<CgShop.Domain.Platform.PlatformSettings> PlatformSettings => Set<CgShop.Domain.Platform.PlatformSettings>();
 
     protected override void OnModelCreating(ModelBuilder builder)

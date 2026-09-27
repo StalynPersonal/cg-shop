@@ -107,3 +107,20 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         b.Ignore(v => v.Description);
     }
 }
+
+internal sealed class ProductChangeConfiguration : IEntityTypeConfiguration<ProductChange>
+{
+    public void Configure(EntityTypeBuilder<ProductChange> b)
+    {
+        b.ToTable("ProductChanges");
+        b.HasKey(c => c.Id);
+        b.Property(c => c.ProductName).HasMaxLength(200).IsRequired();
+        b.Property(c => c.Type).HasConversion<string>().HasMaxLength(30);
+        b.Property(c => c.Details).HasMaxLength(ProductChange.DetailsMax);
+        b.Property(c => c.UserId).HasMaxLength(450).IsRequired();
+        b.Property(c => c.UserName).HasMaxLength(150).IsRequired();
+        b.Property(c => c.UserRole).HasMaxLength(30);
+        b.HasIndex(c => new { c.TenantId, c.ProductId, c.CreatedAtUtc });
+        // Sin FK al producto: el historial se conserva aunque el producto se elimine.
+    }
+}

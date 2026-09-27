@@ -28,6 +28,12 @@ public sealed class ProductAdminService(
                 actor, Now, "Stock inicial al crear la variante"));
     }
 
+    /// <summary>Anota un cambio en el historial del producto (mismo SaveChanges que el cambio: atómico).</summary>
+    private void Record(IAppDbContext db, Product product, ProductChangeType type, string? details, ActorInfo actor) =>
+        db.ProductChanges.Add(new ProductChange(product, type, details, actor, Now));
+
+    private static string Money(decimal value) => value.ToString("N2", System.Globalization.CultureInfo.InvariantCulture);
+
     public async Task<PagedResult<ProductAdminRowDto>> ListAsync(string? search, ProductCategory? category,
         int page = 1, int pageSize = 25, CancellationToken ct = default)
     {
@@ -84,6 +90,9 @@ public sealed class ProductAdminService(
 
         db.Products.Add(product);
         RecordInitialStock(db, product, product.Variants, actor);
+        Record(db, product, ProductChangeType.Created,
+            $"{product.Category.DisplayName()} · {product.Audience.DisplayName()} · {product.Variants.Count} variante(s): " +
+            string.Join(", ", product.Variants.Select(v => v.Sku)), actor);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Producto {ProductId} creado por {User}", product.Id, actor.UserId);
         return product.Id;
@@ -94,10 +103,42 @@ public sealed class ProductAdminService(
         Guard.RequireStaff(actor);
         await using var db = dbFactory.CreateDbContext();
         var product = await LoadAsync(db, productId, ct);
+        var before = Snapshot(product);
         product.Update(dto.Name, dto.Brand, dto.Description, dto.ImageUrl, dto.Attributes);
         product.SetAudience(dto.Audience);
         await EnsureUniqueSlugAsync(db, product, ct);
+        var changes = DescribeChanges(before, Snapshot(product));
+        if (changes.Count > 0)
+            Record(db, product, ProductChangeType.Updated, string.Join("; ", changes), actor);
         await db.SaveChangesAsync(ct);
+    }
+
+    private sealed record ProductSnapshot(string Name, string? Brand, string? Description, string? ImageUrl,
+        ProductAudience Audience, Dictionary<string, string> Attributes);
+
+    private static ProductSnapshot Snapshot(Product p) =>
+        new(p.Name, p.Brand, p.Description, p.ImageUrl, p.Audience, new Dictionary<string, string>(p.Attributes));
+
+    /// <summary>Lista legible de lo que cambió ("Nombre: 'A' → 'B'").</summary>
+    private static List<string> DescribeChanges(ProductSnapshot a, ProductSnapshot b)
+    {
+        var changes = new List<string>();
+        void Text(string field, string? from, string? to)
+        {
+            if (!string.Equals(from, to, StringComparison.Ordinal))
+                changes.Add($"{field}: '{from ?? "—"}' → '{to ?? "—"}'");
+        }
+
+        Text("Nombre", a.Name, b.Name);
+        Text("Marca", a.Brand, b.Brand);
+        if (!string.Equals(a.Description, b.Description, StringComparison.Ordinal))
+            changes.Add("Descripción modificada");
+        Text("Imagen externa", a.ImageUrl, b.ImageUrl);
+        if (a.Audience != b.Audience)
+            changes.Add($"Para: {a.Audience.DisplayName()} → {b.Audience.DisplayName()}");
+        foreach (var key in a.Attributes.Keys.Union(b.Attributes.Keys).Order())
+            Text(key, a.Attributes.GetValueOrDefault(key), b.Attributes.GetValueOrDefault(key));
+        return changes;
     }
 
     public async Task SetActiveAsync(Guid productId, bool active, ActorInfo actor, CancellationToken ct = default)
@@ -105,8 +146,11 @@ public sealed class ProductAdminService(
         Guard.RequireStaff(actor);
         await using var db = dbFactory.CreateDbContext();
         var product = await LoadAsync(db, productId, ct);
+        if (product.IsActive == active)
+            return;
         if (active) product.Activate();
         else product.Deactivate();
+        Record(db, product, active ? ProductChangeType.Activated : ProductChangeType.Deactivated, null, actor);
         await db.SaveChangesAsync(ct);
     }
 
@@ -121,12 +165,15 @@ public sealed class ProductAdminService(
         if (hasSales)
         {
             product.Deactivate();
+            Record(db, product, ProductChangeType.Deactivated, "Se intentó eliminar, pero tiene ventas: quedó desactivado.", actor);
         }
         else
         {
             foreach (var v in product.Variants.Where(v => v.StockOnHand > 0))
                 db.StockMovements.Add(new StockMovement(v, product.Name, StockMovementType.ManualAdjustment,
                     -v.StockOnHand, v.StockOnHand, actor, Now, "Producto eliminado"));
+            Record(db, product, ProductChangeType.Deleted,
+                $"{product.Variants.Count} variante(s) y {product.Variants.Sum(v => v.StockOnHand)} unidad(es) en stock.", actor);
             db.Products.Remove(product); // las fotos se eliminan en cascada
         }
         var imagePaths = hasSales
@@ -149,6 +196,8 @@ public sealed class ProductAdminService(
         var variant = product.AddVariant(dto.Sku, dto.Price, dto.InitialStock, dto.Size, dto.Color, dto.VolumeMl);
         variant.TenantId = product.TenantId;
         RecordInitialStock(db, product, [variant], actor);
+        Record(db, product, ProductChangeType.VariantAdded,
+            $"{variant.Sku} ({variant.Description}) · precio {Money(variant.Price)} · stock {variant.StockOnHand}", actor);
         await db.SaveChangesAsync(ct);
         return variant.Id;
     }
@@ -158,24 +207,57 @@ public sealed class ProductAdminService(
         Guard.RequireStaff(actor);
         await using var db = dbFactory.CreateDbContext();
         var product = await LoadAsync(db, productId, ct);
-        if (await db.OrderItems.AnyAsync(i => i.VariantId == variantId, ct))
-            throw new DomainException("La variante tiene ventas registradas; ajuste su stock a cero en lugar de eliminarla.");
-        var variant = product.Variants.FirstOrDefault(v => v.Id == variantId);
+        await EnsureNoPendingOrdersAsync(db, [variantId], "eliminar la variante", ct);
+        var variant = product.Variants.FirstOrDefault(v => v.Id == variantId)
+                      ?? throw new NotFoundException("Variante no encontrada.");
         product.RemoveVariant(variantId);
-        if (variant is { StockOnHand: > 0 })
+        if (variant.StockOnHand > 0)
             db.StockMovements.Add(new StockMovement(variant, product.Name, StockMovementType.ManualAdjustment,
                 -variant.StockOnHand, variant.StockOnHand, actor, Now, "Variante eliminada"));
+        Record(db, product, ProductChangeType.VariantRemoved,
+            $"{variant.Sku} ({variant.Description}) · stock eliminado {variant.StockOnHand}", actor);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Una variante con pedidos pendientes de pago (stock reservado) no puede eliminarse: al validar el pago
+    /// no habría a qué descontar. Los pedidos ya pagados sí lo permiten: conservan su propia copia.
+    /// </summary>
+    private static async Task EnsureNoPendingOrdersAsync(IAppDbContext db, IReadOnlyCollection<Guid> variantIds,
+        string action, CancellationToken ct)
+    {
+        var pending = await db.StockReservations
+            .Where(r => variantIds.Contains(r.VariantId) && r.Status == CgShop.Domain.Orders.ReservationStatus.Active)
+            .Select(r => r.OrderId).Distinct().CountAsync(ct);
+        if (pending > 0)
+            throw new DomainException($"No se puede {action}: hay {pending} pedido(s) pendiente(s) de pago con este producto. " +
+                                      "Valide, rechace o cancele esos pedidos primero.");
     }
 
     public async Task ChangePriceAsync(Guid variantId, decimal price, ActorInfo actor, CancellationToken ct = default)
     {
         Guard.RequireStaff(actor);
         await using var db = dbFactory.CreateDbContext();
-        var variant = await db.ProductVariants.FirstOrDefaultAsync(v => v.Id == variantId, ct)
+        var variant = await db.ProductVariants.Include(v => v.Product).FirstOrDefaultAsync(v => v.Id == variantId, ct)
                       ?? throw new NotFoundException("Variante no encontrada.");
+        var before = variant.Price;
         variant.ChangePrice(price);
+        if (before != variant.Price)
+            Record(db, variant.Product!, ProductChangeType.PriceChanged,
+                $"{variant.Sku}: {Money(before)} → {Money(variant.Price)}", actor);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Historial de cambios del producto (más reciente primero). Solo el propietario.</summary>
+    public async Task<IReadOnlyList<ProductChangeDto>> GetHistoryAsync(Guid productId, ActorInfo actor,
+        CancellationToken ct = default)
+    {
+        Guard.RequireTenantAdmin(actor);
+        await using var db = dbFactory.CreateDbContext();
+        return await db.ProductChanges.AsNoTracking().Where(c => c.ProductId == productId)
+            .OrderByDescending(c => c.CreatedAtUtc).ThenByDescending(c => c.Id)
+            .Select(c => new ProductChangeDto(c.Id, c.Type, c.Details, c.UserName, c.UserRole, c.CreatedAtUtc))
+            .ToListAsync(ct);
     }
 
     /// <summary>Ajuste manual de inventario (entrada o salida). Reintenta ante conflicto de concurrencia.</summary>

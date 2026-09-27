@@ -76,6 +76,12 @@ public abstract class StoreTestContext : MudTestContext
 
     internal AppDbContext CreateDbPublic() => CreateDb();
 
+    /// <summary>Fábrica de contextos para instanciar servicios sin resolverlos del contenedor de bUnit.</summary>
+    protected sealed class DirectFactory(StoreTestContext owner) : IAppDbContextFactory
+    {
+        public IAppDbContext CreateDbContext() => owner.CreateDbPublic();
+    }
+
     protected ActorInfo Admin => TestData.TenantAdmin;
 
     protected async Task SeedProductsAsync(int count = TestData.BatchSize, int stock = 50)

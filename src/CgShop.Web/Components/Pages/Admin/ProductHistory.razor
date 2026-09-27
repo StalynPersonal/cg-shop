@@ -1,0 +1,71 @@
+@* Historial de cambios del producto (solo propietario): quién cambió qué y cuándo. *@
+@inject ProductAdminService Products
+
+<MudPaper Class="pa-6 mt-4" Outlined="true" data-testid="product-history">
+    <MudText Typo="Typo.h6">Historial de cambios</MudText>
+    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mb-3">
+        Registro inalterable de lo que se ha hecho con este producto y quién lo hizo. Los cambios de stock están en
+        <MudLink Href="/admin/inventario/movimientos" Typo="Typo.caption">Movimientos de inventario</MudLink>.
+    </MudText>
+    @if (_changes is null)
+    {
+        <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+    }
+    else if (_changes.Count == 0)
+    {
+        <MudText Class="mud-text-secondary">Sin cambios registrados.</MudText>
+    }
+    else
+    {
+        @foreach (var change in _changes)
+        {
+            <div class="cg-line" data-testid="history-entry">
+                <div class="d-flex align-center flex-wrap gap-2">
+                    <MudChip T="string" Size="Size.Small" Color="@ColorFor(change.Type)" Variant="Variant.Outlined">
+                        @change.Type.DisplayName()
+                    </MudChip>
+                    <MudText Typo="Typo.body2">
+                        <b>@change.UserName</b>@(RoleLabel(change.UserRole) is { } role ? $" ({role})" : "") · @Ui.Date(change.AtUtc)
+                    </MudText>
+                </div>
+                @if (change.Details is not null)
+                {
+                    <MudText Typo="Typo.body2" Class="mud-text-secondary mt-1" Style="word-break:break-word">@change.Details</MudText>
+                }
+            </div>
+        }
+    }
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public Guid ProductId { get; set; }
+
+    /// <summary>Se incrementa desde el editor tras cada cambio para recargar el historial.</summary>
+    [Parameter] public int Version { get; set; }
+
+    private IReadOnlyList<ProductChangeDto>? _changes;
+    private int _loadedVersion = -1;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedVersion == Version)
+            return;
+        _loadedVersion = Version;
+        _changes = await Products.GetHistoryAsync(ProductId, Actor);
+    }
+
+    private static string? RoleLabel(string? role) => role switch
+    {
+        Roles.TenantAdmin => "Propietario",
+        Roles.TenantStaff => "Empleado",
+        _ => null
+    };
+
+    private static Color ColorFor(ProductChangeType type) => type switch
+    {
+        ProductChangeType.CategoryChanged or ProductChangeType.Deleted or ProductChangeType.VariantRemoved => Color.Warning,
+        ProductChangeType.PriceChanged => Color.Info,
+        ProductChangeType.Created or ProductChangeType.VariantAdded or ProductChangeType.Activated => Color.Success,
+        _ => Color.Default
+    };
+}

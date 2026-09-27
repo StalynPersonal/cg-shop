@@ -130,6 +130,9 @@ else
     else
     {
         <ProductGalleryEditor ProductId="Id!.Value" Colors="@(_variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList())" />
+        <AuthorizeView Policy="@Policies.TenantAdmin">
+            <ProductHistory ProductId="Id!.Value" Version="_historyVersion" />
+        </AuthorizeView>
     }
 }
 
@@ -143,6 +146,7 @@ else
     private MudForm _form = default!;
     private ProductUpsertDto _product = new();
     private IReadOnlyList<VariantDto> _variants = [];
+    private int _historyVersion;
     private readonly List<VariantUpsertDto> _newVariants = [];
     private VariantUpsertDto _variant = new();
     private string? _newAttrKey;
@@ -178,6 +182,7 @@ else
         try
         {
             (_product, _variants) = await Products.GetForEditAsync(Id!.Value);
+            _historyVersion++;
         }
         catch (NotFoundException)
         {
@@ -266,7 +271,8 @@ else
         }
         else
         {
-            await Snackbar.TryAsync(() => Products.UpdateAsync(Id!.Value, _product, Actor), "Producto actualizado.");
+            if (await Snackbar.TryAsync(() => Products.UpdateAsync(Id!.Value, _product, Actor), "Producto actualizado."))
+                _historyVersion++;
         }
 
         _saving = false;

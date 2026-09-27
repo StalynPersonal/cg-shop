@@ -221,6 +221,10 @@ public static class AdminEndpoints
             return Results.Created($"/api/admin/products/{id}", new { id });
         });
 
+        admin.MapGet("/products/{id:guid}/history", (Guid id, ProductAdminService products, HttpContext http,
+            CancellationToken ct) => products.GetHistoryAsync(id, http.User.ToActor(), ct))
+            .RequireAuthorization(ApiPolicies.TenantAdmin);
+
         admin.MapGet("/products/{id:guid}/images", (Guid id, ProductImageService images, CancellationToken ct) =>
             images.ListAsync(id, ct));
 

@@ -57,9 +57,4 @@ public sealed class StockMovementsPageTests : StoreTestContext
         cut.WaitForAssertion(() => cut.Markup.Should().Contain("Pagos por validar"));
         cut.FindAll("[data-testid='manual-adjustments-alert']").Should().BeEmpty();
     }
-
-    private sealed class DirectFactory(StoreTestContext owner) : CgShop.Application.Common.IAppDbContextFactory
-    {
-        public CgShop.Application.Common.IAppDbContext CreateDbContext() => owner.CreateDbPublic();
-    }
 }
