@@ -114,7 +114,15 @@ else
                 <MudText Typo="Typo.h6" Class="mb-2">Cliente</MudText>
                 <MudText><b>@_order.CustomerName</b></MudText>
                 <MudText>@_order.CustomerEmail · @_order.CustomerPhone</MudText>
-                <MudText>@_order.ShippingAddress</MudText>
+                <MudChip T="string" Size="Size.Small" Class="ml-0" data-testid="delivery-chip"
+                         Icon="@(_order.DeliveryMethod == DeliveryMethod.Shipping ? Icons.Material.Filled.LocalShipping : Icons.Material.Filled.Store)">
+                    @_order.DeliveryMethod.DisplayName()
+                </MudChip>
+                @if (_order.DeliveryMethod == DeliveryMethod.Shipping)
+                {
+                    <MudText>@_order.ShippingAddress</MudText>
+                    <MudText Typo="Typo.caption" Color="Color.Warning">Costo de envío por coordinar con el cliente según la zona.</MudText>
+                }
                 <MudDivider Class="my-2" />
                 <MudText Typo="Typo.body2">Método: @_order.PaymentMethod.DisplayName()</MudText>
                 <MudText Typo="Typo.body2">Creado: @Ui.Date(_order.CreatedAtUtc)</MudText>

@@ -99,6 +99,45 @@ public class OrderServicesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Checkout_of_100_orders_alternating_shipping_and_pickup()
+    {
+        var checkout = Checkout();
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var request = Request(i);
+            if (i % 2 == 1)
+            {
+                request.DeliveryMethod = DeliveryMethod.Pickup;
+                request.ShippingAddress = null;
+            }
+
+            await checkout.PlaceOrderAsync(request);
+        }
+
+        await using var ctx = _factory.CreateAppDbContext();
+        (await ctx.Orders.CountAsync(o => o.DeliveryMethod == DeliveryMethod.Pickup && o.ShippingAddress == null)).Should().Be(50);
+        (await ctx.Orders.CountAsync(o => o.DeliveryMethod == DeliveryMethod.Shipping && o.ShippingAddress != null)).Should().Be(50);
+
+        var detail = await Admin().ListAsync(new OrderQuery(PageSize: 200));
+        detail.Items.Count(o => o.DeliveryMethod == DeliveryMethod.Pickup).Should().Be(50);
+    }
+
+    [Fact]
+    public async Task Shipping_without_address_is_rejected_but_pickup_is_accepted()
+    {
+        var checkout = Checkout();
+        var shipping = Request(0);
+        shipping.ShippingAddress = "";
+        var ex = await checkout.Invoking(c => c.PlaceOrderAsync(shipping)).Should().ThrowAsync<ValidationException>();
+        ex.Which.Errors.Should().Contain(e => e.Contains("dirección de envío"));
+
+        var pickup = Request(0);
+        pickup.ShippingAddress = null;
+        pickup.DeliveryMethod = DeliveryMethod.Pickup;
+        (await checkout.PlaceOrderAsync(pickup)).Number.Should().NotBeEmpty();
+    }
+
+    [Fact]
     public async Task Checkout_without_tenant_is_forbidden()
     {
         var noTenant = _db.For((CgShop.Application.Tenancy.TenantInfo?)null);

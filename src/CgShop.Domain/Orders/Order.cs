@@ -5,8 +5,9 @@ namespace CgShop.Domain.Orders;
 public sealed record OrderLine(Guid VariantId, string Sku, string ProductName, string VariantDescription,
     decimal UnitPrice, int Quantity);
 
-public sealed record CustomerInfo(string FullName, string Email, string Phone, string ShippingAddress,
-    string? UserId = null);
+/// <param name="ShippingAddress">Obligatoria para <see cref="DeliveryMethod.Shipping"/>; se ignora en retiro.</param>
+public sealed record CustomerInfo(string FullName, string Email, string Phone, string? ShippingAddress,
+    string? UserId = null, DeliveryMethod Delivery = DeliveryMethod.Shipping);
 
 /// <summary>
 /// Agregado raíz de la orden. Encapsula la máquina de estados y la auditoría.
@@ -29,7 +30,11 @@ public sealed class Order : Entity, ITenantEntity
     public string CustomerName { get; private set; } = "";
     public string CustomerEmail { get; private set; } = "";
     public string CustomerPhone { get; private set; } = "";
-    public string ShippingAddress { get; private set; } = "";
+    public DeliveryMethod DeliveryMethod { get; private set; } = DeliveryMethod.Shipping;
+
+    /// <summary>Dirección de envío; nula cuando el cliente retira en tienda.</summary>
+    public string? ShippingAddress { get; private set; }
+
     public string? CustomerUserId { get; private set; }
 
     public decimal Subtotal { get; private set; }
@@ -63,9 +68,12 @@ public sealed class Order : Entity, ITenantEntity
             throw new DomainException("El número de orden es obligatorio.");
         if (lines.Count == 0)
             throw new DomainException("La orden debe contener al menos un producto.");
-        if (string.IsNullOrWhiteSpace(customer.FullName) || string.IsNullOrWhiteSpace(customer.Email) ||
-            string.IsNullOrWhiteSpace(customer.ShippingAddress))
-            throw new DomainException("Nombre, correo y dirección de envío son obligatorios.");
+        if (string.IsNullOrWhiteSpace(customer.FullName) || string.IsNullOrWhiteSpace(customer.Email))
+            throw new DomainException("Nombre y correo son obligatorios.");
+        if (!Enum.IsDefined(customer.Delivery))
+            throw new DomainException("Seleccione envío o retiro en tienda.");
+        if (customer.Delivery == DeliveryMethod.Shipping && string.IsNullOrWhiteSpace(customer.ShippingAddress))
+            throw new DomainException("La dirección de envío es obligatoria para pedidos con envío.");
         if (!customer.Email.Contains('@'))
             throw new DomainException("El correo electrónico no es válido.");
         if (reservationTtl <= TimeSpan.Zero)
@@ -79,7 +87,8 @@ public sealed class Order : Entity, ITenantEntity
             CustomerName = customer.FullName.Trim(),
             CustomerEmail = customer.Email.Trim().ToLowerInvariant(),
             CustomerPhone = customer.Phone?.Trim() ?? "",
-            ShippingAddress = customer.ShippingAddress.Trim(),
+            DeliveryMethod = customer.Delivery,
+            ShippingAddress = customer.Delivery == DeliveryMethod.Shipping ? customer.ShippingAddress!.Trim() : null,
             CustomerUserId = customer.UserId,
             TaxRate = taxRate,
             Currency = currency,

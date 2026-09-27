@@ -38,7 +38,8 @@ public sealed class CustomerOrderService(
         return new PaymentInstructionsDto(tenant.Name, tenant.Currency, method,
             method == PaymentMethod.BankTransfer ? ps.BankAccounts : [],
             method == PaymentMethod.PaymentLink ? ps.PaymentLinkUrl : null,
-            ps.Instructions);
+            ps.Instructions,
+            ps.PickupAddress);
     }
 
     public async Task<IReadOnlyList<PaymentMethod>> GetAvailablePaymentMethodsAsync(CancellationToken ct = default)

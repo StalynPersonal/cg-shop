@@ -60,6 +60,30 @@ public sealed class OrderFlowTests(SqlServerFixture fx)
     }
 
     [Fact]
+    public async Task Delivery_method_and_optional_address_are_persisted_for_100_orders()
+    {
+        var (tenant, variantIds) = await TenantWithStockAsync();
+        await using var scope = fx.TenantScope(tenant);
+        var checkout = scope.ServiceProvider.GetRequiredService<CheckoutService>();
+
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var request = Request(i, variantIds);
+            if (i % 4 == 0)
+            {
+                request.DeliveryMethod = DeliveryMethod.Pickup;
+                request.ShippingAddress = null;
+            }
+
+            await checkout.PlaceOrderAsync(request);
+        }
+
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.Orders.CountAsync(o => o.DeliveryMethod == DeliveryMethod.Pickup && o.ShippingAddress == null)).Should().Be(25);
+        (await db.Orders.CountAsync(o => o.DeliveryMethod == DeliveryMethod.Shipping && o.ShippingAddress != null)).Should().Be(75);
+    }
+
+    [Fact]
     public async Task Owner_validates_50_and_rejects_50_stock_is_committed_or_released()
     {
         var (tenant, variantIds) = await TenantWithStockAsync(stockPerVariant: 1000);

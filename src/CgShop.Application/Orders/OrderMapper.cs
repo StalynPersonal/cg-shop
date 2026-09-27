@@ -5,7 +5,7 @@ namespace CgShop.Application.Orders;
 internal static class OrderMapper
 {
     public static OrderDetailDto ToDetail(Order o) => new(
-        o.Id, o.Number, o.Status, o.PaymentMethod, o.CustomerName, o.CustomerEmail, o.CustomerPhone,
+        o.Id, o.Number, o.Status, o.PaymentMethod, o.DeliveryMethod, o.CustomerName, o.CustomerEmail, o.CustomerPhone,
         o.ShippingAddress, o.Subtotal, o.Tax, o.Total, o.Currency, o.CreatedAtUtc, o.ReservationExpiresAtUtc,
         o.PaymentValidatedAtUtc, o.PaymentValidatedBy,
         o.Items.Select(i => new OrderItemDto(i.Sku, i.ProductName, i.VariantDescription, i.UnitPrice, i.Quantity,

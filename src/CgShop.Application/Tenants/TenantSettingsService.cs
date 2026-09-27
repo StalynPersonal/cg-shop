@@ -18,6 +18,7 @@ public sealed class TenantSettingsService(IAppDbContextFactory dbFactory, ITenan
         {
             PaymentLinkUrl = tenant.PaymentSettings.PaymentLinkUrl,
             Instructions = tenant.PaymentSettings.Instructions,
+            PickupAddress = tenant.PaymentSettings.PickupAddress,
             BankAccounts = tenant.PaymentSettings.BankAccounts.Select(b => new BankAccount
             {
                 BankName = b.BankName, AccountNumber = b.AccountNumber, AccountHolder = b.AccountHolder,

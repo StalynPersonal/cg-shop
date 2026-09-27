@@ -6,6 +6,9 @@ public sealed class PaymentSettings
     public string? PaymentLinkUrl { get; set; }
     public string? Instructions { get; set; }
 
+    /// <summary>Dirección donde el cliente retira su pedido (opción "Retiro en tienda").</summary>
+    public string? PickupAddress { get; set; }
+
     public bool AcceptsBankTransfer => BankAccounts.Count > 0;
     public bool AcceptsPaymentLink => !string.IsNullOrWhiteSpace(PaymentLinkUrl);
 }

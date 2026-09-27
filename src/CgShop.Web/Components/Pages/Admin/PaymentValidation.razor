@@ -38,6 +38,7 @@ else
                     <MudCardContent>
                         <MudText Typo="Typo.h5" Color="Color.Primary">@Ui.Money(order.Total, Currency)</MudText>
                         <MudText Typo="Typo.body2">@order.PaymentMethod.DisplayName() · @order.ItemCount artículo(s)</MudText>
+                        <MudText Typo="Typo.body2">@order.DeliveryMethod.DisplayName()</MudText>
                         <MudText Typo="Typo.caption" Color="@(order.ReservationExpiresAtUtc < DateTime.UtcNow.AddHours(6) ? Color.Error : Color.Secondary)">
                             Creado @Ui.Date(order.CreatedAtUtc) · Reserva hasta @Ui.Date(order.ReservationExpiresAtUtc)
                         </MudText>

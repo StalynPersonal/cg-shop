@@ -48,6 +48,10 @@ else
                 <MudTextField @bind-Value="_settings.Instructions" Label="Mensaje para el cliente" Lines="3"
                               Variant="Variant.Outlined" MaxLength="2000" />
 
+                <MudText Typo="Typo.h6" Class="mt-6 mb-2">Retiro en tienda</MudText>
+                <MudTextField @bind-Value="_settings.PickupAddress" Label="Dirección de retiro (se muestra a quien elige retirar)"
+                              Lines="2" Variant="Variant.Outlined" MaxLength="500" />
+
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-4" OnClick="Save">Guardar</MudButton>
             </MudPaper>
         </MudItem>

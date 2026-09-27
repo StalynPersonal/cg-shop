@@ -64,7 +64,7 @@ public sealed class CheckoutService(
             var ttl = TimeSpan.FromHours(options.Value.ReservationHours);
             var created = Order.Place(NewOrderNumber(now),
                 new CustomerInfo(request.FullName, request.Email, request.Phone, request.ShippingAddress,
-                    request.CustomerUserId),
+                    request.CustomerUserId, request.DeliveryMethod),
                 lines, request.PaymentMethod, tenant.TaxRate, tenant.Currency, now, ttl);
 
             db.Orders.Add(created);
@@ -92,7 +92,9 @@ public sealed class CheckoutService(
         if (string.IsNullOrWhiteSpace(r.FullName)) errors.Add("El nombre es obligatorio.");
         if (string.IsNullOrWhiteSpace(r.Email) || !r.Email.Contains('@')) errors.Add("Correo electrónico inválido.");
         if (string.IsNullOrWhiteSpace(r.Phone)) errors.Add("El teléfono es obligatorio.");
-        if (string.IsNullOrWhiteSpace(r.ShippingAddress)) errors.Add("La dirección de envío es obligatoria.");
+        if (!Enum.IsDefined(r.DeliveryMethod)) errors.Add("Seleccione envío o retiro en tienda.");
+        if (r.DeliveryMethod == DeliveryMethod.Shipping && string.IsNullOrWhiteSpace(r.ShippingAddress))
+            errors.Add("La dirección de envío es obligatoria para pedidos con envío.");
         if (r.Lines.Count == 0) errors.Add("El carrito está vacío.");
         if (r.Lines.Any(l => l.Quantity is <= 0 or > MaxQuantityPerLine))
             errors.Add($"Las cantidades deben estar entre 1 y {MaxQuantityPerLine}.");

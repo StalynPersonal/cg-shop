@@ -145,6 +145,32 @@ public class OrderTests
     }
 
     [Fact]
+    public void Pickup_orders_have_no_address_and_shipping_orders_require_one_for_100_orders()
+    {
+        for (var i = 1; i <= TestData.BatchSize; i++)
+        {
+            var product = TestData.Product(i);
+            var lines = new[] { TestData.LineFor(product.Variants[0], product, 1) };
+
+            var pickup = Order.Place($"P-{i}", TestData.CustomerInfo(i) with
+            {
+                Delivery = DeliveryMethod.Pickup, ShippingAddress = "se ignora"
+            }, lines, PaymentMethod.BankTransfer, 0.18m, "DOP", TestData.Now, TimeSpan.FromHours(1));
+            pickup.DeliveryMethod.Should().Be(DeliveryMethod.Pickup);
+            pickup.ShippingAddress.Should().BeNull();
+
+            var shipping = Order.Place($"S-{i}", TestData.CustomerInfo(i), lines, PaymentMethod.BankTransfer, 0.18m,
+                "DOP", TestData.Now, TimeSpan.FromHours(1));
+            shipping.DeliveryMethod.Should().Be(DeliveryMethod.Shipping);
+            shipping.ShippingAddress.Should().Be($"Calle {i}, Santo Domingo");
+
+            var noAddress = () => Order.Place($"X-{i}", TestData.CustomerInfo(i) with { ShippingAddress = " " }, lines,
+                PaymentMethod.BankTransfer, 0.18m, "DOP", TestData.Now, TimeSpan.FromHours(1));
+            noAddress.Should().Throw<DomainException>().WithMessage("*dirección de envío*");
+        }
+    }
+
+    [Fact]
     public void Place_merges_duplicate_variant_lines_and_validates_input()
     {
         var product = TestData.Product(1);

@@ -26,7 +26,7 @@ else
         <MudItem xs="12" md="8">
             <MudPaper Class="pa-6" Outlined="true">
                 <MudForm @ref="_form" @bind-IsValid="_valid">
-                    <MudText Typo="Typo.h6" Class="mb-2">Datos de contacto y envío</MudText>
+                    <MudText Typo="Typo.h6" Class="mb-2">Datos de contacto</MudText>
                     <MudGrid Spacing="2">
                         <MudItem xs="12" sm="6">
                             <MudTextField @bind-Value="_request.FullName" Label="Nombre completo" Required="true"
@@ -40,11 +40,11 @@ else
                             <MudTextField @bind-Value="_request.Phone" Label="Teléfono" Required="true" RequiredError="Requerido"
                                           InputType="InputType.Telephone" Variant="Variant.Outlined" MaxLength="30" />
                         </MudItem>
-                        <MudItem xs="12">
-                            <MudTextField @bind-Value="_request.ShippingAddress" Label="Dirección de envío" Required="true"
-                                          RequiredError="Requerido" Lines="2" Variant="Variant.Outlined" MaxLength="500" />
-                        </MudItem>
                     </MudGrid>
+
+                    <MudText Typo="Typo.h6" Class="mt-6 mb-2">Entrega</MudText>
+                    <DeliveryOptions @bind-Method="_request.DeliveryMethod" @bind-Address="_request.ShippingAddress"
+                                     PickupAddress="@_pickupAddress" />
 
                     <MudText Typo="Typo.h6" Class="mt-6 mb-2">Método de pago</MudText>
                     @if (_methods.Count == 0)
@@ -68,7 +68,8 @@ else
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="4">
-            <OrderSummary Subtotal="_subtotal" TaxRate="@(Host.Tenant?.TaxRate ?? 0.18m)" Currency="@Host.Currency">
+            <OrderSummary Subtotal="_subtotal" TaxRate="@(Host.Tenant?.TaxRate ?? 0.18m)" Currency="@Host.Currency"
+                          Delivery="_request.DeliveryMethod">
                 <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" FullWidth="true"
                            Disabled="@(_submitting || _methods.Count == 0)" OnClick="PlaceOrder" data-testid="place-order">
                     @if (_submitting)
@@ -90,6 +91,7 @@ else
     private bool _submitting;
     private decimal _subtotal;
     private IReadOnlyList<PaymentMethod>? _methods;
+    private string? _pickupAddress;
     private readonly PlaceOrderRequest _request = new();
 
     protected override async Task OnInitializedAsync()
@@ -97,6 +99,7 @@ else
         _methods = await CustomerOrders.GetAvailablePaymentMethodsAsync();
         if (_methods.Count > 0)
             _request.PaymentMethod = _methods[0];
+        _pickupAddress = (await CustomerOrders.GetPaymentInstructionsAsync(_request.PaymentMethod)).PickupAddress;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

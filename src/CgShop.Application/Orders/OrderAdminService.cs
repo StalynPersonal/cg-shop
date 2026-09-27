@@ -37,7 +37,7 @@ public sealed class OrderAdminService(
         var total = await orders.CountAsync(ct);
         var items = await orders.OrderByDescending(o => o.CreatedAtUtc).ThenByDescending(o => o.Id)
             .Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(o => new OrderRowDto(o.Id, o.Number, o.Status, o.PaymentMethod, o.CustomerName, o.CustomerEmail,
+            .Select(o => new OrderRowDto(o.Id, o.Number, o.Status, o.PaymentMethod, o.DeliveryMethod, o.CustomerName, o.CustomerEmail,
                 o.Total, o.Items.Sum(i => i.Quantity), o.Receipts.Count, o.CreatedAtUtc, o.ReservationExpiresAtUtc))
             .ToListAsync(ct);
         return new PagedResult<OrderRowDto>(items, total, page, pageSize);

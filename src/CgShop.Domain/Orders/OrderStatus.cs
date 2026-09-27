@@ -18,8 +18,24 @@ public enum PaymentMethod
     PaymentLink = 2
 }
 
+public enum DeliveryMethod
+{
+    /// <summary>Envío a domicilio (costo adicional según zona, coordinado por la tienda).</summary>
+    Shipping = 1,
+
+    /// <summary>Retiro en tienda (sin dirección de envío).</summary>
+    Pickup = 2
+}
+
 public static class OrderStatusExtensions
 {
+    public static string DisplayName(this DeliveryMethod method) => method switch
+    {
+        DeliveryMethod.Shipping => "Envío a domicilio",
+        DeliveryMethod.Pickup => "Retiro en tienda",
+        _ => method.ToString()
+    };
+
     public static string DisplayName(this OrderStatus status) => status switch
     {
         OrderStatus.PendingPaymentValidation => "Pendiente de validación de pago",

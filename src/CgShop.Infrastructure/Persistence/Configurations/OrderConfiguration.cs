@@ -22,7 +22,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         b.Property(o => o.CustomerName).HasMaxLength(150).IsRequired();
         b.Property(o => o.CustomerEmail).HasMaxLength(200).IsRequired();
         b.Property(o => o.CustomerPhone).HasMaxLength(30);
-        b.Property(o => o.ShippingAddress).HasMaxLength(500).IsRequired();
+        b.Property(o => o.ShippingAddress).HasMaxLength(500);
+        b.Property(o => o.DeliveryMethod).HasConversion<string>().HasMaxLength(20);
         b.Property(o => o.CustomerUserId).HasMaxLength(450);
         b.Property(o => o.Subtotal).HasPrecision(18, 2);
         b.Property(o => o.Tax).HasPrecision(18, 2);

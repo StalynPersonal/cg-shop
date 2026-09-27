@@ -1,0 +1,46 @@
+@* Selección de entrega: envío (dirección obligatoria + aviso de costo adicional) o retiro en tienda. *@
+<MudRadioGroup T="DeliveryMethod" Value="Method" ValueChanged="OnMethodChanged" data-testid="delivery-method">
+    <MudRadio Value="DeliveryMethod.Shipping" Color="Color.Primary" data-testid="delivery-shipping">
+        @DeliveryMethod.Shipping.DisplayName()
+    </MudRadio>
+    <MudRadio Value="DeliveryMethod.Pickup" Color="Color.Primary" data-testid="delivery-pickup">
+        @DeliveryMethod.Pickup.DisplayName()
+    </MudRadio>
+</MudRadioGroup>
+
+@if (Method == DeliveryMethod.Shipping)
+{
+    <MudTextField T="string" Value="Address" ValueChanged="AddressChanged" Label="Dirección de envío" Required="true"
+                  RequiredError="La dirección es obligatoria para envíos" Lines="2" Variant="Variant.Outlined"
+                  MaxLength="500" Class="mt-2" data-testid="shipping-address" />
+    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2" data-testid="shipping-cost-note">
+        El envío tiene un <b>costo adicional</b> que depende de la zona de entrega y no está incluido en el total.
+        La tienda te confirmará el monto antes de despachar.
+    </MudAlert>
+}
+else
+{
+    <MudAlert Severity="Severity.Success" Dense="true" Class="mt-2" data-testid="pickup-note">
+        Retiras tu pedido en la tienda sin costo de envío, una vez validado el pago.
+        @if (PickupAddress is not null)
+        {
+            <br /><b>Dirección de retiro:</b> @PickupAddress
+        }
+    </MudAlert>
+}
+
+@code {
+    [Parameter] public DeliveryMethod Method { get; set; } = DeliveryMethod.Shipping;
+    [Parameter] public EventCallback<DeliveryMethod> MethodChanged { get; set; }
+    [Parameter] public string? Address { get; set; }
+    [Parameter] public EventCallback<string?> AddressChanged { get; set; }
+    [Parameter] public string? PickupAddress { get; set; }
+
+    private async Task OnMethodChanged(DeliveryMethod method)
+    {
+        Method = method;
+        await MethodChanged.InvokeAsync(method);
+        if (method == DeliveryMethod.Pickup)
+            await AddressChanged.InvokeAsync(null); // el retiro no lleva dirección
+    }
+}

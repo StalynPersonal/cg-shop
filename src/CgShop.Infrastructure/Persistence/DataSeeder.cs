@@ -61,7 +61,10 @@ public sealed class DataSeeder(
                 }
             ],
             PaymentLinkUrl = $"https://pagos.ejemplo.com/{slug}",
-            Instructions = "Envíe el comprobante indicando su número de orden. Validamos pagos en horario laborable."
+            Instructions = "Envíe el comprobante indicando su número de orden. Validamos pagos en horario laborable.",
+            PickupAddress = slug == "verde"
+                ? "Av. Abraham Lincoln #100, Piantini, Santo Domingo (L-S 9:00-18:00)"
+                : "C/ El Conde #50, Zona Colonial, Santo Domingo (L-S 10:00-19:00)"
         });
         db.Tenants.Add(tenant);
         await db.SaveChangesAsync(ct);
@@ -87,7 +90,8 @@ public sealed class DataSeeder(
                 FullName = $"Cliente Demo {i + 1}",
                 Email = $"cliente{i + 1}@correo.com",
                 Phone = $"809-555-000{i}",
-                ShippingAddress = $"Av. Winston Churchill #{10 + i}, Santo Domingo",
+                DeliveryMethod = i == 1 ? DeliveryMethod.Pickup : DeliveryMethod.Shipping,
+                ShippingAddress = i == 1 ? null : $"Av. Winston Churchill #{10 + i}, Santo Domingo",
                 PaymentMethod = i % 2 == 0 ? PaymentMethod.BankTransfer : PaymentMethod.PaymentLink,
                 Lines = [new CartLine(variants[i * 3].Id, 1), new CartLine(variants[i * 3 + 1].Id, 2)]
             }, ct);

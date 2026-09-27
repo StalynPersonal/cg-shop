@@ -7,6 +7,13 @@
         <MudStack Row="true" Justify="Justify.SpaceBetween">
             <MudText>ITBIS (@((TaxRate * 100).ToString("0.##"))%)</MudText><MudText>@Ui.Money(Tax, Currency)</MudText>
         </MudStack>
+        @if (Delivery is { } delivery)
+        {
+            <MudStack Row="true" Justify="Justify.SpaceBetween" data-testid="summary-delivery">
+                <MudText>@(delivery == DeliveryMethod.Shipping ? "Envío" : "Retiro en tienda")</MudText>
+                <MudText Color="Color.Secondary">@(delivery == DeliveryMethod.Shipping ? "A coordinar según zona" : "Sin costo")</MudText>
+            </MudStack>
+        }
         <MudDivider Class="my-2" />
         <MudStack Row="true" Justify="Justify.SpaceBetween">
             <MudText Typo="Typo.h6">Total</MudText>
@@ -24,6 +31,9 @@
     [Parameter] public decimal TaxRate { get; set; }
     [Parameter] public string Currency { get; set; } = "DOP";
     [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Si se indica, muestra la línea de envío/retiro (el costo de envío se coordina aparte).</summary>
+    [Parameter] public DeliveryMethod? Delivery { get; set; }
 
     private decimal Tax => Math.Round(Subtotal * TaxRate, 2, MidpointRounding.AwayFromZero);
 }

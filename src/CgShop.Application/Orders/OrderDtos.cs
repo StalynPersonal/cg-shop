@@ -10,7 +10,11 @@ public sealed class PlaceOrderRequest
     public string FullName { get; set; } = "";
     public string Email { get; set; } = "";
     public string Phone { get; set; } = "";
-    public string ShippingAddress { get; set; } = "";
+    public DeliveryMethod DeliveryMethod { get; set; } = DeliveryMethod.Shipping;
+
+    /// <summary>Obligatoria solo si <see cref="DeliveryMethod"/> es envío.</summary>
+    public string? ShippingAddress { get; set; }
+
     public PaymentMethod PaymentMethod { get; set; } = PaymentMethod.BankTransfer;
     public List<CartLine> Lines { get; set; } = [];
     public string? CustomerUserId { get; set; }
@@ -33,10 +37,11 @@ public sealed record OrderDetailDto(
     string Number,
     OrderStatus Status,
     PaymentMethod PaymentMethod,
+    DeliveryMethod DeliveryMethod,
     string CustomerName,
     string CustomerEmail,
     string CustomerPhone,
-    string ShippingAddress,
+    string? ShippingAddress,
     decimal Subtotal,
     decimal Tax,
     decimal Total,
@@ -55,6 +60,7 @@ public sealed record OrderRowDto(
     string Number,
     OrderStatus Status,
     PaymentMethod PaymentMethod,
+    DeliveryMethod DeliveryMethod,
     string CustomerName,
     string CustomerEmail,
     decimal Total,
@@ -69,7 +75,8 @@ public sealed record PaymentInstructionsDto(
     PaymentMethod Method,
     IReadOnlyList<BankAccount> BankAccounts,
     string? PaymentLinkUrl,
-    string? Instructions);
+    string? Instructions,
+    string? PickupAddress);
 
 public sealed record OrderQuery(OrderStatus? Status = null, string? Search = null, int Page = 1, int PageSize = 25);
 

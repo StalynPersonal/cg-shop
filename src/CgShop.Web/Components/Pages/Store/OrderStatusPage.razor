@@ -131,6 +131,26 @@ else
                     Guarda este enlace para consultar tu pedido.
                 </MudText>
             </MudPaper>
+
+            <MudPaper Class="pa-4 mt-4" Outlined="true" data-testid="delivery-info">
+                <MudText Typo="Typo.h6" Class="mb-1">Entrega</MudText>
+                <MudText><b>@_order.DeliveryMethod.DisplayName()</b></MudText>
+                @if (_order.DeliveryMethod == DeliveryMethod.Shipping)
+                {
+                    <MudText Typo="Typo.body2">@_order.ShippingAddress</MudText>
+                    <MudAlert Severity="Severity.Warning" Dense="true" Class="mt-2">
+                        El envío tiene un costo adicional según la zona; la tienda te confirmará el monto antes de despachar.
+                    </MudAlert>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2">Retiras en la tienda una vez validado el pago.</MudText>
+                    @if (_instructions?.PickupAddress is { } pickup)
+                    {
+                        <MudText Typo="Typo.body2"><b>Dirección:</b> @pickup</MudText>
+                    }
+                }
+            </MudPaper>
         </MudItem>
     </MudGrid>
 }
