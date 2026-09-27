@@ -44,7 +44,7 @@
         </TemplateColumn>
     </Columns>
     <NoRecordsContent><MudText>No hay pedidos con estos filtros.</MudText></NoRecordsContent>
-    <PagerContent><MudDataGridPager T="OrderRowDto" /></PagerContent>
+    <PagerContent><MudDataGridPager T="OrderRowDto" RowsPerPageString="Filas:" InfoFormat="{first_item}-{last_item} de {all_items}" /></PagerContent>
 </MudDataGrid>
 
 @code {

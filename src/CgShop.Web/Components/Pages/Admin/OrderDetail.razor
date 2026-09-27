@@ -8,13 +8,16 @@
 else
 {
     <PageTitle>Pedido #@_order.Number · @Host.Tenant?.Name</PageTitle>
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-4">
-        <MudStack Row="true" AlignItems="AlignItems.Center">
-            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/admin/pedidos" aria-label="Volver" />
-            <MudText Typo="Typo.h4">Pedido #@_order.Number</MudText>
-            <OrderStatusChip Status="_order.Status" Size="Size.Medium" />
+    <MudStack Spacing="2" Class="mb-4">
+        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+            <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/admin/pedidos" aria-label="Volver" Edge="Edge.Start" />
+            <div style="min-width:0">
+                <MudText Typo="Typo.overline" Class="mud-text-secondary d-block" Style="line-height:1.2">Pedido</MudText>
+                <MudText Typo="Typo.h4" Class="cg-detail-title" data-testid="order-title">#@_order.Number</MudText>
+            </div>
         </MudStack>
-        <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap">
+        <div><OrderStatusChip Status="_order.Status" Size="Size.Medium" /></div>
+        <div class="cg-actions" data-testid="order-actions">
             @if (_order.Status == OrderStatus.PendingPaymentValidation)
             {
                 <AuthorizeView Policy="@Policies.TenantAdmin">
@@ -47,7 +50,7 @@ else
             {
                 <MudButton Color="Color.Error" Variant="Variant.Text" OnClick="Cancel">Cancelar pedido</MudButton>
             }
-        </MudStack>
+        </div>
     </MudStack>
 
     <MudGrid>
@@ -90,23 +93,8 @@ else
 
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">Productos</MudText>
-                <MudSimpleTable Dense="true">
-                    <thead><tr><th>SKU</th><th>Producto</th><th>Cant.</th><th style="text-align:right">Importe</th></tr></thead>
-                    <tbody>
-                    @foreach (var item in _order.Items)
-                    {
-                        <tr>
-                            <td>@item.Sku</td>
-                            <td>@item.ProductName<br /><small>@item.VariantDescription</small></td>
-                            <td>@item.Quantity × @Ui.Money(item.UnitPrice, _order.Currency)</td>
-                            <td style="text-align:right">@Ui.Money(item.LineTotal, _order.Currency)</td>
-                        </tr>
-                    }
-                    <tr><td colspan="3">Subtotal</td><td style="text-align:right">@Ui.Money(_order.Subtotal, _order.Currency)</td></tr>
-                    <tr><td colspan="3">ITBIS</td><td style="text-align:right">@Ui.Money(_order.Tax, _order.Currency)</td></tr>
-                    <tr><td colspan="3"><b>Total</b></td><td style="text-align:right"><b>@Ui.Money(_order.Total, _order.Currency)</b></td></tr>
-                    </tbody>
-                </MudSimpleTable>
+                <OrderItemsList Items="_order.Items" Subtotal="_order.Subtotal" Tax="_order.Tax" Total="_order.Total"
+                                Currency="@_order.Currency" />
             </MudPaper>
         </MudItem>
         <MudItem xs="12" md="5">

@@ -30,7 +30,7 @@ else
                         </MudSelect>
                         <MudTextField @bind-Value="_product.Brand" Label="Marca" Variant="Variant.Outlined" MaxLength="100" />
                         <MudTextField @bind-Value="_product.Description" Label="Descripción" Lines="4" Variant="Variant.Outlined" MaxLength="4000" />
-                        <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen externa (opcional, si no sube fotos)" Variant="Variant.Outlined" />
+                        <MudTextField @bind-Value="_product.ImageUrl" Label="URL de imagen externa" HelperText="Opcional: solo si no sube fotos más abajo" Variant="Variant.Outlined" />
 
                         <MudText Typo="Typo.subtitle1" Class="mt-2">Atributos de @_product.Category.DisplayName()</MudText>
                         <MudText Typo="Typo.caption" Class="mud-text-secondary">@AttributeHint</MudText>
@@ -44,7 +44,7 @@ else
                             </MudStack>
                         }
                         <MudStack Row="true" AlignItems="AlignItems.Center">
-                            <MudTextField @bind-Value="_newAttrKey" Label="Nuevo atributo" Variant="Variant.Outlined" Margin="Margin.Dense" />
+                            <MudTextField @bind-Value="_newAttrKey" Label="Atributo" Placeholder="Ej. Material" Variant="Variant.Outlined" Margin="Margin.Dense" />
                             <MudTextField @bind-Value="_newAttrValue" Label="Valor" Variant="Variant.Outlined" Margin="Margin.Dense" />
                             <MudIconButton Icon="@Icons.Material.Filled.Add" OnClick="AddAttribute" aria-label="Agregar atributo" />
                         </MudStack>
@@ -62,34 +62,33 @@ else
                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
                     Cada combinación de @DimensionsText es un SKU con su propio precio y stock.
                 </MudText>
-                <MudSimpleTable Dense="true" Class="my-3">
-                    <thead><tr><th>SKU</th><th>Variante</th><th>Precio</th><th>Stock</th><th></th></tr></thead>
-                    <tbody>
+                <div class="my-3" data-testid="variant-list">
                     @foreach (var v in IsNew ? _newVariants.Select(ToPreview) : _variants)
                     {
-                        <tr>
-                            <td>@v.Sku</td>
-                            <td>@v.Description</td>
-                            <td>
+                        <div class="cg-line" data-testid="variant-row">
+                            <div class="cg-line-main">
+                                <MudText Typo="Typo.body1"><b>@v.Sku</b></MudText>
+                                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                                    @(string.IsNullOrEmpty(v.Description) ? "Única" : v.Description) · Disponible: @v.Available
+                                </MudText>
+                            </div>
+                            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
                                 @if (IsNew)
                                 {
-                                    @Ui.Money(v.Price, Currency)
+                                    <MudText Class="cg-line-amount">@Ui.Money(v.Price, Currency)</MudText>
                                 }
                                 else
                                 {
                                     <MudNumericField T="decimal" Value="v.Price" ValueChanged="p => ChangePrice(v, p)" Min="1m"
-                                                     Variant="Variant.Text" Margin="Margin.Dense" DebounceInterval="800" Style="max-width:130px" />
+                                                     Label="Precio" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                                     DebounceInterval="800" HideSpinButtons="true" Style="width:120px" />
                                 }
-                            </td>
-                            <td>@v.Available</td>
-                            <td>
                                 <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small" Color="Color.Error"
                                                OnClick="() => RemoveVariant(v)" aria-label="Quitar variante" />
-                            </td>
-                        </tr>
+                            </MudStack>
+                        </div>
                     }
-                    </tbody>
-                </MudSimpleTable>
+                </div>
 
                 <MudText Typo="Typo.subtitle2" Class="mt-4">Agregar variante</MudText>
                 <MudGrid Spacing="1">

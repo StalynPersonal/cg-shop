@@ -60,7 +60,7 @@
         </TemplateColumn>
     </Columns>
     <NoRecordsContent><MudText>No hay productos.</MudText></NoRecordsContent>
-    <PagerContent><MudDataGridPager T="ProductAdminRowDto" /></PagerContent>
+    <PagerContent><MudDataGridPager T="ProductAdminRowDto" RowsPerPageString="Filas:" InfoFormat="{first_item}-{last_item} de {all_items}" /></PagerContent>
 </MudDataGrid>
 
 @code {

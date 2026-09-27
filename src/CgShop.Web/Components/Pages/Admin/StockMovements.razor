@@ -80,7 +80,7 @@
         </TemplateColumn>
     </Columns>
     <NoRecordsContent><MudText>No hay movimientos con estos filtros.</MudText></NoRecordsContent>
-    <PagerContent><MudDataGridPager T="StockMovementDto" /></PagerContent>
+    <PagerContent><MudDataGridPager T="StockMovementDto" RowsPerPageString="Filas:" InfoFormat="{first_item}-{last_item} de {all_items}" /></PagerContent>
 </MudDataGrid>
 
 @code {

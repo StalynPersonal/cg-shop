@@ -1,4 +1,6 @@
 @inherits LayoutComponentBase
+@implements IDisposable
+@inject NavigationManager Navigation
 
 <AuthorizeView>
     <Authorized>
@@ -27,6 +29,8 @@
         </MudHidden>
     </MudAppBar>
 
+    @* Detecta pantalla pequeña: ahí el menú se cierra solo al navegar. *@
+    <MudHidden Breakpoint="Breakpoint.SmAndDown" HiddenChanged="v => _isSmallScreen = v" />
     <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="1" Variant="DrawerVariant.Responsive">
         <MudNavMenu Color="Color.Primary">
             <MudNavLink Href="/admin" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Dashboard">Resumen</MudNavLink>
@@ -53,4 +57,18 @@
 @code {
     [CascadingParameter] private HostContext Host { get; set; } = default!;
     private bool _drawerOpen = true;
+    private bool _isSmallScreen;
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        if (_isSmallScreen && _drawerOpen)
+        {
+            _drawerOpen = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
 }

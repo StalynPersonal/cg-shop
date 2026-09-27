@@ -18,9 +18,10 @@ else if (_order is null)
 }
 else
 {
-    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Class="mb-4">
-        <MudText Typo="Typo.h4">Pedido #@_order.Number</MudText>
-        <OrderStatusChip Status="_order.Status" Size="Size.Large" />
+    <MudStack Spacing="1" Class="mb-4">
+        <MudText Typo="Typo.overline" Class="mud-text-secondary" Style="line-height:1.2">Pedido</MudText>
+        <MudText Typo="Typo.h4" Class="cg-detail-title">#@_order.Number</MudText>
+        <div><OrderStatusChip Status="_order.Status" Size="Size.Medium" /></div>
     </MudStack>
 
     <MudGrid>
@@ -115,20 +116,8 @@ else
         <MudItem xs="12" md="5">
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">Productos</MudText>
-                @foreach (var item in _order.Items)
-                {
-                    <MudStack Row="true" Justify="Justify.SpaceBetween" Class="mb-1">
-                        <MudText Typo="Typo.body2">@item.Quantity × @item.ProductName <br /><small>@item.VariantDescription</small></MudText>
-                        <MudText Typo="Typo.body2">@Ui.Money(item.LineTotal, _order.Currency)</MudText>
-                    </MudStack>
-                }
-                <MudDivider Class="my-2" />
-                <MudStack Row="true" Justify="Justify.SpaceBetween"><MudText>Subtotal</MudText><MudText>@Ui.Money(_order.Subtotal, _order.Currency)</MudText></MudStack>
-                <MudStack Row="true" Justify="Justify.SpaceBetween"><MudText>ITBIS</MudText><MudText>@Ui.Money(_order.Tax, _order.Currency)</MudText></MudStack>
-                <MudStack Row="true" Justify="Justify.SpaceBetween">
-                    <MudText Typo="Typo.h6">Total</MudText>
-                    <MudText Typo="Typo.h6" Color="Color.Primary">@Ui.Money(_order.Total, _order.Currency)</MudText>
-                </MudStack>
+                <OrderItemsList Items="_order.Items" Subtotal="_order.Subtotal" Tax="_order.Tax" Total="_order.Total"
+                                Currency="@_order.Currency" ShowSku="false" />
                 <MudText Typo="Typo.caption" Class="mud-text-secondary mt-2 d-block">
                     Guarda este enlace para consultar tu pedido.
                 </MudText>

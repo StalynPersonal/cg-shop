@@ -85,7 +85,7 @@ public sealed class AdminPagesTests : StoreTestContext
 
         var cut = Render<OrderDetail>(p => p.AddCascadingValue(HostContext).Add(x => x.Id, order.OrderId));
 
-        cut.WaitForAssertion(() => cut.Markup.Should().Contain($"Pedido #{order.Number}"));
+        cut.WaitForAssertion(() => cut.Find("[data-testid='order-title']").TextContent.Should().Be($"#{order.Number}"));
         cut.Markup.Should().Contain("Validar pago").And.Contain("Rechazar pago").And.Contain("Auditoría");
         cut.Markup.Should().Contain("Pendiente de validación de pago");
         cut.Markup.Should().NotContain("Marcar enviado"); // no se despacha sin pago validado

@@ -77,6 +77,28 @@ html, body {
     white-space: nowrap;
 }
 
+/* Líneas de pedido (producto + importe) sin tablas */
+.cg-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+
+.cg-line-compact {
+    border-bottom: none;
+    padding: 2px 0;
+    align-items: center;
+}
+
+.cg-line-main { min-width: 0; overflow-wrap: anywhere; }
+.cg-line-amount { white-space: nowrap; font-weight: 500; }
+
+/* Encabezado de detalle: número del pedido legible y sin cortar el estado */
+.cg-detail-title { overflow-wrap: anywhere; line-height: 1.2; }
+
 /* Botones de acción que deben apilarse ordenadamente en celular */
 .cg-actions {
     display: flex;

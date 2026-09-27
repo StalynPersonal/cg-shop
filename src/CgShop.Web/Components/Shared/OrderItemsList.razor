@@ -1,0 +1,38 @@
+@* Productos y totales de un pedido en formato de lista: legible en celular sin scroll horizontal. *@
+<div data-testid="order-items">
+    @foreach (var item in Items)
+    {
+        <div class="cg-line" data-testid="order-item">
+            <div class="cg-line-main">
+                <MudText Typo="Typo.body1"><b>@item.ProductName</b></MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                    @item.VariantDescription@(ShowSku ? $" · SKU {item.Sku}" : "")
+                </MudText>
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                    @item.Quantity × @Ui.Money(item.UnitPrice, Currency)
+                </MudText>
+            </div>
+            <MudText Typo="Typo.body1" Class="cg-line-amount">@Ui.Money(item.LineTotal, Currency)</MudText>
+        </div>
+    }
+    <MudDivider Class="my-2" />
+    <div class="cg-line cg-line-compact">
+        <MudText>Subtotal</MudText><MudText>@Ui.Money(Subtotal, Currency)</MudText>
+    </div>
+    <div class="cg-line cg-line-compact">
+        <MudText>ITBIS</MudText><MudText>@Ui.Money(Tax, Currency)</MudText>
+    </div>
+    <div class="cg-line cg-line-compact">
+        <MudText Typo="Typo.h6">Total</MudText>
+        <MudText Typo="Typo.h6" Color="Color.Primary" data-testid="order-items-total">@Ui.Money(Total, Currency)</MudText>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OrderItemDto> Items { get; set; } = [];
+    [Parameter] public decimal Subtotal { get; set; }
+    [Parameter] public decimal Tax { get; set; }
+    [Parameter] public decimal Total { get; set; }
+    [Parameter] public string Currency { get; set; } = "DOP";
+    [Parameter] public bool ShowSku { get; set; } = true;
+}
