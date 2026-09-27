@@ -17,7 +17,7 @@ public static class ProductCategoryExtensions
         ProductCategory.Caps => "Gorras",
         ProductCategory.Watches => "Relojes",
         ProductCategory.Perfumes => "Perfumes",
-        ProductCategory.Footwear => "Tenis y Calzados",
+        ProductCategory.Footwear => "Calzados",
         _ => category.ToString()
     };
 
