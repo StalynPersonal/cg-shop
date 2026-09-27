@@ -1,0 +1,40 @@
+@* Confirmación con texto enriquecido. Con Danger=true el botón de acción es rojo (acciones que eliminan datos). *@
+<MudDialog data-testid="confirm-dialog">
+    <DialogContent>
+        <MudText Typo="Typo.body1" Style="max-width:560px">@Message</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="Cancel" data-testid="confirm-cancel">Cancelar</MudButton>
+        <MudButton OnClick="Confirm" Variant="Variant.Filled" Color="@(Danger ? Color.Error : Color.Primary)"
+                   StartIcon="@(Danger ? Icons.Material.Filled.Warning : null)" data-testid="confirm-ok">
+            @ConfirmText
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+
+    [Parameter] public MarkupString Message { get; set; }
+    [Parameter] public string ConfirmText { get; set; } = "Aceptar";
+    [Parameter] public bool Danger { get; set; }
+
+    private void Confirm() => Dialog.Close(DialogResult.Ok(true));
+    private void Cancel() => Dialog.Cancel();
+
+    /// <summary>Muestra la confirmación y devuelve true si el usuario aceptó.</summary>
+    public static async Task<bool> AskAsync(IDialogService dialogs, string title, MarkupString message,
+        string confirmText, bool danger = false)
+    {
+        var parameters = new DialogParameters<ConfirmDialog>
+        {
+            { x => x.Message, message },
+            { x => x.ConfirmText, confirmText },
+            { x => x.Danger, danger }
+        };
+        var dialog = await dialogs.ShowAsync<ConfirmDialog>(title, parameters,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true, CloseOnEscapeKey = true });
+        var result = await dialog.Result;
+        return result is { Canceled: false };
+    }
+}

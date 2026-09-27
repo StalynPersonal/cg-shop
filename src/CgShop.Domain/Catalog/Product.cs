@@ -166,6 +166,30 @@ public sealed class Product : Entity, ITenantEntity
         _variants.Remove(variant);
     }
 
+    /// <summary>
+    /// Cambia la categoría. Si la nueva usa otras dimensiones de variante (p. ej. Perfumes → Ropa), las variantes
+    /// no tienen sentido y se eliminan (se devuelven para registrar su stock); si son compatibles, se conservan.
+    /// Los pedidos anteriores no se afectan: guardan su propia copia.
+    /// </summary>
+    public IReadOnlyList<ProductVariant> ChangeCategory(ProductCategory category)
+    {
+        if (!Enum.IsDefined(category))
+            throw new DomainException("Categoría inválida.");
+        if (category == Category)
+            throw new DomainException("El producto ya está en esa categoría.");
+
+        List<ProductVariant> removed = Category.HasSameVariantsAs(category) ? [] : [.. _variants];
+        if (removed.Any(v => v.StockReserved > 0))
+            throw new DomainException("Hay pedidos pendientes de pago con este producto; valídelos, recházelos o cancélelos primero.");
+        foreach (var variant in removed)
+            _variants.Remove(variant);
+        if (removed.Count > 0)
+            foreach (var image in _images)
+                image.Color = null; // los colores eran de las variantes eliminadas
+        Category = category;
+        return removed;
+    }
+
     /// <summary>Asigna un slug alternativo (p.ej. con sufijo) cuando el generado ya existe en la tienda.</summary>
     public void UseSlug(string slug)
     {

@@ -31,6 +31,13 @@ public static class ProductCategoryExtensions
     public static string SizeLabel(this ProductCategory category) =>
         category == ProductCategory.Phones ? "Capacidad" : "Talla";
 
+    /// <summary>
+    /// Dos categorías son compatibles si sus variantes usan las mismas dimensiones (p. ej. Ropa, Gorras y Calzados:
+    /// talla + color). Entre compatibles, las variantes se conservan al cambiar la categoría.
+    /// </summary>
+    public static bool HasSameVariantsAs(this ProductCategory category, ProductCategory other) =>
+        category.VariantDimensions() == other.VariantDimensions();
+
     /// <summary>Qué dimensiones de variante son relevantes por categoría (usado por la UI y validaciones).</summary>
     public static (bool Size, bool Color, bool Volume) VariantDimensions(this ProductCategory category) => category switch
     {

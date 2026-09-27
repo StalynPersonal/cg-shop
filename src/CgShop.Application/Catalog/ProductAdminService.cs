@@ -226,9 +226,7 @@ public sealed class ProductAdminService(
     private static async Task EnsureNoPendingOrdersAsync(IAppDbContext db, IReadOnlyCollection<Guid> variantIds,
         string action, CancellationToken ct)
     {
-        var pending = await db.StockReservations
-            .Where(r => variantIds.Contains(r.VariantId) && r.Status == CgShop.Domain.Orders.ReservationStatus.Active)
-            .Select(r => r.OrderId).Distinct().CountAsync(ct);
+        var pending = await PendingOrdersAsync(db, variantIds, ct);
         if (pending > 0)
             throw new DomainException($"No se puede {action}: hay {pending} pedido(s) pendiente(s) de pago con este producto. " +
                                       "Valide, rechace o cancele esos pedidos primero.");
@@ -247,6 +245,61 @@ public sealed class ProductAdminService(
                 $"{variant.Sku}: {Money(before)} → {Money(variant.Price)}", actor);
         await db.SaveChangesAsync(ct);
     }
+
+    /// <summary>Vista previa del cambio de categoría: si se conservan las variantes o cuántas se eliminarían.</summary>
+    public async Task<CategoryChangePreviewDto> PreviewCategoryChangeAsync(Guid productId, ProductCategory category,
+        ActorInfo actor, CancellationToken ct = default)
+    {
+        Guard.RequireTenantAdmin(actor);
+        await using var db = dbFactory.CreateDbContext();
+        var product = await LoadAsync(db, productId, ct);
+        var keeps = product.Category.HasSameVariantsAs(category);
+        var variantIds = product.Variants.Select(v => v.Id).ToList();
+        var pending = keeps ? 0 : await PendingOrdersAsync(db, variantIds, ct);
+        return new CategoryChangePreviewDto(product.Category, category, keeps, product.Variants.Count,
+            product.Variants.Sum(v => v.StockOnHand), pending, product.Variants.Select(v => v.Sku).Order().ToList());
+    }
+
+    /// <summary>
+    /// Cambia la categoría (solo propietario). Entre categorías compatibles conserva las variantes; si no, las elimina
+    /// registrando la salida de su stock en Movimientos de inventario. Siempre queda en el historial del producto.
+    /// </summary>
+    public async Task<CategoryChangePreviewDto> ChangeCategoryAsync(Guid productId, ProductCategory category,
+        ActorInfo actor, CancellationToken ct = default)
+    {
+        Guard.RequireTenantAdmin(actor);
+        await using var db = dbFactory.CreateDbContext();
+        // Con fotos: si se eliminan las variantes, sus colores dejan de existir y las fotos quedan generales.
+        var product = await db.Products.Include(p => p.Variants).Include(p => p.Images)
+                          .FirstOrDefaultAsync(p => p.Id == productId, ct)
+                      ?? throw new NotFoundException("Producto no encontrado.");
+        var from = product.Category;
+        if (!from.HasSameVariantsAs(category))
+            await EnsureNoPendingOrdersAsync(db, product.Variants.Select(v => v.Id).ToList(), "cambiar la categoría", ct);
+
+        var reason = $"Cambio de categoría: {from.DisplayName()} → {category.DisplayName()}";
+        var removed = product.ChangeCategory(category);
+        foreach (var v in removed.Where(v => v.StockOnHand > 0))
+            db.StockMovements.Add(new StockMovement(v, product.Name, StockMovementType.ManualAdjustment,
+                -v.StockOnHand, v.StockOnHand, actor, Now, reason));
+
+        var units = removed.Sum(v => v.StockOnHand);
+        Record(db, product, ProductChangeType.CategoryChanged, removed.Count == 0
+            ? $"{from.DisplayName()} → {category.DisplayName()}. Se conservaron {product.Variants.Count} variante(s)."
+            : $"{from.DisplayName()} → {category.DisplayName()}. Se eliminaron {removed.Count} variante(s) " +
+              $"({string.Join(", ", removed.Select(v => v.Sku))}) con {units} unidad(es) en stock.", actor);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Producto {Product}: categoría {From} → {To} por {User}; {Removed} variantes eliminadas",
+            productId, from, category, actor.UserId, removed.Count);
+        return new CategoryChangePreviewDto(from, category, removed.Count == 0, removed.Count == 0 ? product.Variants.Count : removed.Count,
+            units, 0, removed.Select(v => v.Sku).ToList());
+    }
+
+    private static Task<int> PendingOrdersAsync(IAppDbContext db, IReadOnlyCollection<Guid> variantIds,
+        CancellationToken ct) =>
+        db.StockReservations
+            .Where(r => variantIds.Contains(r.VariantId) && r.Status == CgShop.Domain.Orders.ReservationStatus.Active)
+            .Select(r => r.OrderId).Distinct().CountAsync(ct);
 
     /// <summary>Historial de cambios del producto (más reciente primero). Solo el propietario.</summary>
     public async Task<IReadOnlyList<ProductChangeDto>> GetHistoryAsync(Guid productId, ActorInfo actor,

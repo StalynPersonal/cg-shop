@@ -19,6 +19,7 @@ public sealed record TokenResponse(string AccessToken, DateTime ExpiresAtUtc, st
 public sealed record NoteRequest(string? Note);
 public sealed record StockAdjustRequest(int Delta, string Reason);
 public sealed record ImageColorRequest(string? Color);
+public sealed record CategoryChangeRequest(ProductCategory Category);
 public sealed record CreateProductRequest(ProductUpsertDto Product, List<VariantUpsertDto> Variants);
 
 public static class AuthEndpoints
@@ -220,6 +221,14 @@ public static class AdminEndpoints
             var id = await products.CreateAsync(body.Product, body.Variants, http.User.ToActor(), ct);
             return Results.Created($"/api/admin/products/{id}", new { id });
         });
+
+        // Cambio de categoría (propietario): primero la vista previa (qué pasa con las variantes), luego el cambio.
+        admin.MapGet("/products/{id:guid}/category-change", (Guid id, ProductCategory category, ProductAdminService products,
+            HttpContext http, CancellationToken ct) => products.PreviewCategoryChangeAsync(id, category, http.User.ToActor(), ct))
+            .RequireAuthorization(ApiPolicies.TenantAdmin);
+        admin.MapPut("/products/{id:guid}/category", (Guid id, CategoryChangeRequest body, ProductAdminService products,
+            HttpContext http, CancellationToken ct) => products.ChangeCategoryAsync(id, body.Category, http.User.ToActor(), ct))
+            .RequireAuthorization(ApiPolicies.TenantAdmin);
 
         admin.MapGet("/products/{id:guid}/history", (Guid id, ProductAdminService products, HttpContext http,
             CancellationToken ct) => products.GetHistoryAsync(id, http.User.ToActor(), ct))

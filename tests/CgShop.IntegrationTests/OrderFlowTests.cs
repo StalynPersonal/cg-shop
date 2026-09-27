@@ -448,4 +448,40 @@ public sealed class OrderFlowTests(SqlServerFixture fx)
         var soldProducts = await db.OrderItems.Select(i => i.ProductId).Distinct().ToListAsync();
         soldProducts.Should().Contain(removedProducts.Select(p => p.Id));
     }
+
+    [Fact]
+    public async Task Changing_a_sold_perfume_to_clothing_removes_its_variants_in_sql_server()
+    {
+        var tenant = await fx.CreateTenantAsync();
+        await using var scope = fx.TenantScope(tenant);
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var perfume = Product.Create("Perfume Test", ProductCategory.Perfumes);
+        foreach (var ml in new[] { 50, 100 })
+            perfume.AddVariant($"PT-{ml}", 3000 + ml, 10, volumeMl: ml);
+        db.Products.Add(perfume);
+        await db.SaveChangesAsync();
+
+        var checkout = scope.ServiceProvider.GetRequiredService<CheckoutService>();
+        var admin = scope.ServiceProvider.GetRequiredService<OrderAdminService>();
+        var orderIds = new List<Guid>();
+        for (var i = 0; i < 10; i++)
+        {
+            var r = await checkout.PlaceOrderAsync(Request(i, perfume.Variants.Select(v => v.Id).ToList()));
+            await admin.ValidatePaymentAsync(r.OrderId, TestData.TenantAdmin, null);
+            orderIds.Add(r.OrderId);
+        }
+
+        var products = scope.ServiceProvider.GetRequiredService<CgShop.Application.Catalog.ProductAdminService>();
+        await products.ChangeCategoryAsync(perfume.Id, ProductCategory.Clothing, TestData.TenantAdmin);
+
+        db.ChangeTracker.Clear();
+        (await db.ProductVariants.CountAsync(v => v.ProductId == perfume.Id)).Should().Be(0);
+        (await db.Products.SingleAsync(p => p.Id == perfume.Id)).Category.Should().Be(ProductCategory.Clothing);
+        foreach (var id in orderIds)
+            (await admin.GetAsync(id)).Items.Single().Sku.Should().StartWith("PT-");
+        (await db.StockMovements.CountAsync(m => m.ProductId == perfume.Id && m.Reason == "Cambio de categoría: Perfumes → Ropa"))
+            .Should().Be(2);
+        (await db.ProductChanges.CountAsync(c => c.ProductId == perfume.Id && c.Type == ProductChangeType.CategoryChanged))
+            .Should().Be(1);
+    }
 }

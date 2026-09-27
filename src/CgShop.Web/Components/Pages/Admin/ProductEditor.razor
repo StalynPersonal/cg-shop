@@ -21,8 +21,9 @@ else
                     <MudStack Spacing="3">
                         <MudTextField @bind-Value="_product.Name" Label="Nombre" Required="true" RequiredError="Requerido"
                                       Variant="Variant.Outlined" MaxLength="200" />
-                        <MudSelect T="ProductCategory" @bind-Value="_product.Category" Label="Categoría" Variant="Variant.Outlined"
-                                   Disabled="@(!IsNew)" HelperText="@(IsNew ? null : "La categoría no puede cambiarse")">
+                        <MudSelect T="ProductCategory" Value="_product.Category" ValueChanged="OnCategoryChangedAsync" Label="Categoría"
+                                   Variant="Variant.Outlined" Disabled="@(!CanChangeCategory || _changingCategory)" HelperText="@CategoryHelp"
+                                   data-testid="product-category">
                             @foreach (var c in Enum.GetValues<ProductCategory>())
                             {
                                 <MudSelectItem Value="c">@c.DisplayName()</MudSelectItem>
@@ -187,6 +188,66 @@ else
         catch (NotFoundException)
         {
             Navigation.NavigateTo("/not-found");
+        }
+    }
+
+    private bool _changingCategory;
+
+    private bool CanChangeCategory => IsNew || Actor.IsTenantAdmin;
+
+    private string? CategoryHelp => IsNew
+        ? null
+        : Actor.IsTenantAdmin
+            ? "Entre categorías con las mismas variantes (p. ej. Ropa y Calzados) se conservan; si no, se eliminan."
+            : "Solo el propietario puede cambiar la categoría.";
+
+    /// <summary>Producto nuevo: cambia directo. Existente: vista previa, aviso y confirmación del propietario.</summary>
+    private async Task OnCategoryChangedAsync(ProductCategory category)
+    {
+        if (IsNew || category == _product.Category)
+        {
+            _product.Category = category;
+            return;
+        }
+
+        _changingCategory = true;
+        try
+        {
+            CategoryChangePreviewDto? preview = null;
+            if (!await Snackbar.TryAsync(async () => preview = await Products.PreviewCategoryChangeAsync(Id!.Value, category, Actor)))
+                return;
+
+            var (from, to) = (preview!.From.DisplayName(), preview.To.DisplayName());
+            if (preview.Blocked)
+            {
+                await Dialogs.ShowMessageBoxAsync("No se puede cambiar la categoría", (MarkupString)(
+                    $"Cambiar de <b>{from}</b> a <b>{to}</b> elimina las variantes, pero hay <b>{preview.PendingOrders} " +
+                    "pedido(s) pendiente(s) de pago</b> con este producto.<br/><br/>Valide, rechace o cancele esos pedidos primero."),
+                    "Entendido");
+                return;
+            }
+
+            var message = preview.KeepsVariants
+                ? $"<b>{from}</b> y <b>{to}</b> usan las mismas variantes: se conservan las <b>{preview.VariantCount}</b> " +
+                  "variante(s) con su precio y stock."
+                : $"<b>{to}</b> usa otras variantes que <b>{from}</b>. <span style=\"color:var(--mud-palette-error)\">" +
+                  $"<b>Se eliminarán las {preview.VariantCount} variante(s)</b> ({string.Join(", ", preview.Skus.Take(10))}" +
+                  $"{(preview.Skus.Count > 10 ? ", …" : "")}) con <b>{preview.UnitsInStock} unidad(es)</b> en stock.</span>" +
+                  "<br/><br/>La salida del stock queda en Movimientos de inventario y los pedidos anteriores no se modifican. " +
+                  "Después agregue las variantes de la nueva categoría.";
+            message += "<br/><br/>El cambio quedará registrado en el historial del producto.";
+
+            if (!await ConfirmDialog.AskAsync(Dialogs, $"Cambiar categoría a {to}", (MarkupString)message,
+                    preview.KeepsVariants ? "Cambiar categoría" : "Eliminar variantes y cambiar", danger: !preview.KeepsVariants))
+                return;
+
+            if (await Snackbar.TryAsync(() => Products.ChangeCategoryAsync(Id!.Value, category, Actor),
+                    preview.KeepsVariants ? $"Categoría cambiada a {to}." : $"Categoría cambiada a {to}. Agregue las nuevas variantes."))
+                await LoadAsync();
+        }
+        finally
+        {
+            _changingCategory = false;
         }
     }
 

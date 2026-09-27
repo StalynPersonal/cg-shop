@@ -139,3 +139,16 @@ public sealed record InventoryRowDto(
 
 public sealed record ProductChangeDto(Guid Id, ProductChangeType Type, string? Details, string UserName, string? UserRole,
     DateTime AtUtc);
+
+/// <summary>Qué pasará al cambiar la categoría (para el aviso de confirmación).</summary>
+public sealed record CategoryChangePreviewDto(
+    ProductCategory From,
+    ProductCategory To,
+    bool KeepsVariants,
+    int VariantCount,
+    int UnitsInStock,
+    int PendingOrders,
+    IReadOnlyList<string> Skus)
+{
+    public bool Blocked => !KeepsVariants && PendingOrders > 0;
+}

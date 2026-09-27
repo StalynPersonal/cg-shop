@@ -504,3 +504,7 @@ html, body {
     .cg-trending-track { grid-auto-columns: 42%; gap: 12px; }
     .cg-trending-arrow.mud-icon-button { display: none; }
 }
+
+/* Historial de cambios del producto: una entrada por bloque, detalle debajo. */
+.cg-history-entry { padding: 10px 0; border-bottom: 1px solid var(--mud-palette-lines-default); }
+.cg-history-entry:last-child { border-bottom: 0; }

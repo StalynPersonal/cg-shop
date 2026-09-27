@@ -19,7 +19,7 @@
     {
         @foreach (var change in _changes)
         {
-            <div class="cg-line" data-testid="history-entry">
+            <div class="cg-history-entry" data-testid="history-entry">
                 <div class="d-flex align-center flex-wrap gap-2">
                     <MudChip T="string" Size="Size.Small" Color="@ColorFor(change.Type)" Variant="Variant.Outlined">
                         @change.Type.DisplayName()
