@@ -50,6 +50,27 @@ public sealed class BrandingComponentsTests : MudTestContext
         }
     }
 
+    [Fact]
+    public async Task Late_echo_from_the_picker_does_not_override_the_preset_just_chosen()
+    {
+        string? selected = null;
+        var cut = Render<BrandColorPicker>(p => p
+            .Add(x => x.Value, null)
+            .Add(x => x.ValueChanged, v => selected = v));
+        var picker = cut.FindComponent<MudBlazor.MudColorPicker>();
+        var presets = BrandColorPicker.Presets.Select(p => p.Hex).ToList();
+
+        cut.Find($"[data-testid='preset-{presets[0]}']").Click();
+        cut.Find($"[data-testid='preset-{presets[1]}']").Click();
+        // El picker devuelve tarde el primer color: se ignora.
+        await cut.InvokeAsync(() => picker.Instance.ValueChanged.InvokeAsync(new MudBlazor.Utilities.MudColor(presets[0])));
+        selected.Should().Be(presets[1]);
+
+        // Un color elegido a mano en el espectro sí se acepta.
+        await cut.InvokeAsync(() => picker.Instance.ValueChanged.InvokeAsync(new MudBlazor.Utilities.MudColor("#123456")));
+        selected.Should().Be("#123456");
+    }
+
     [Theory]
     [InlineData(OrderStatus.PendingPaymentValidation, "Pendiente de validación de pago")]
     [InlineData(OrderStatus.PaymentValidated, "Pago validado")]

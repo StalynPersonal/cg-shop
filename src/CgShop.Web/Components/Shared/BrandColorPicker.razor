@@ -38,22 +38,41 @@
 
     private MudColor? _mudColor;
 
+    /// <summary>
+    /// Colores que nosotros pasamos al MudColorPicker. Éste puede devolverlos como ValueChanged un instante
+    /// después (eco); si llega el eco de un color anterior tras pulsar otro preset, pisaría la elección nueva.
+    /// </summary>
+    private readonly HashSet<string> _pushed = new(StringComparer.OrdinalIgnoreCase);
+
     protected override void OnParametersSet()
     {
         var current = _mudColor?.ToString(MudColorOutputFormats.Hex);
         if (HexColor.IsValid(Value) && !string.Equals(current, Value, StringComparison.OrdinalIgnoreCase))
-            _mudColor = new MudColor(Value!);
+            Push(Value!);
     }
 
     private Task OnPickerChanged(MudColor color)
     {
+        var hex = color.ToString(MudColorOutputFormats.Hex).ToUpperInvariant();
+        if (_pushed.Contains(hex))
+            return Task.CompletedTask; // eco de un color puesto por código, no una elección del usuario
+        _pushed.Clear();
         _mudColor = color;
-        return ValueChanged.InvokeAsync(color.ToString(MudColorOutputFormats.Hex).ToUpperInvariant());
+        return ValueChanged.InvokeAsync(hex);
     }
 
     private Task SetAsync(string? hex)
     {
-        _mudColor = hex is null ? null : new MudColor(hex);
+        if (hex is null)
+            _mudColor = null;
+        else
+            Push(hex);
         return ValueChanged.InvokeAsync(hex);
+    }
+
+    private void Push(string hex)
+    {
+        _mudColor = new MudColor(hex);
+        _pushed.Add(_mudColor.ToString(MudColorOutputFormats.Hex));
     }
 }
