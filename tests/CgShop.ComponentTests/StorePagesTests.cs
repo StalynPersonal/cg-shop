@@ -1,3 +1,4 @@
+using AngleSharp.Dom;
 using Bunit;
 using CgShop.Domain.Catalog;
 using CgShop.Domain.Orders;
@@ -51,6 +52,72 @@ public sealed class StorePagesTests : StoreTestContext
         cut.WaitForAssertion(() => cut.Find("[data-testid='product-name']").TextContent.Should().Be(perfume.Name));
         cut.Markup.Should().Contain("Presentación").And.Contain("ml").And.Contain("Notas Salida");
         cut.Find("[data-testid='add-to-cart']").HasAttribute("disabled").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Clicking_a_variant_marks_it_and_updates_the_sku_for_100_products()
+    {
+        await SeedProductsAsync();
+        var checkedChips = 0;
+
+        foreach (var product in TestData.Products(TestData.BatchSize, Tenant.Id))
+        {
+            var cut = Render<ProductPage>(p => p.AddCascadingValue(HostContext).Add(x => x.Slug, product.Slug));
+            cut.WaitForAssertion(() => cut.Find("[data-testid='product-name']").TextContent.Should().Be(product.Name));
+
+            foreach (var group in new[] { "size", "color", "volume" })
+            {
+                var labels = cut.FindAll($"[data-testid='{group}-chip']").Select(c => c.TextContent.Trim()).ToList();
+                foreach (var label in labels)
+                {
+                    cut.FindAll($"[data-testid='{group}-chip']").Single(c => c.TextContent.Trim() == label).Click();
+
+                    var selected = cut.FindAll($"[data-testid='{group}-chip'].selected");
+                    selected.Should().ContainSingle($"{product.Name}: solo un chip de {group} marcado");
+                    selected[0].TextContent.Trim().Should().Be(label);
+
+                    // La variante resuelta corresponde al chip pulsado (y el color se ajusta a la talla).
+                    var variant = product.Variants.Single(v => cut.Markup.Contains($"SKU {v.Sku}"));
+                    var value = group switch
+                    {
+                        "size" => variant.Size,
+                        "color" => variant.Color,
+                        _ => $"{variant.VolumeMl} ml"
+                    };
+                    value.Should().Be(label);
+                    checkedChips++;
+                }
+            }
+            cut.Dispose();
+        }
+
+        checkedChips.Should().BeGreaterThan(TestData.BatchSize);
+    }
+
+    [Fact]
+    public async Task Size_without_stock_is_read_only()
+    {
+        await SeedProductsAsync();
+        var product = Product.Create("Tenis Agotados", ProductCategory.Footwear, "Nike", null, null);
+        product.AddVariant("AG-40-NG", 5000m, 0, "40", "Negro");
+        product.AddVariant("AG-40-BL", 5000m, 0, "40", "Blanco");
+        product.AddVariant("AG-41-NG", 5000m, 5, "41", "Negro");
+        await using (var db = CreateDb())
+        {
+            db.Products.Add(product);
+            await db.SaveChangesAsync();
+        }
+
+        var cut = Render<ProductPage>(p => p.AddCascadingValue(HostContext).Add(x => x.Slug, product.Slug));
+        cut.WaitForAssertion(() => cut.Find("[data-testid='product-name']").TextContent.Should().Be(product.Name));
+
+        IElement Chip(string group, string text) =>
+            cut.FindAll($"[data-testid='{group}-chip']").Single(c => c.TextContent.Trim() == text);
+
+        Chip("size", "40").ClassList.Should().Contain("mud-disabled");
+        Chip("size", "41").ClassList.Should().NotContain("mud-disabled").And.Contain("selected");
+        Chip("color", "Blanco").ClassList.Should().Contain("mud-disabled"); // sin stock en ninguna talla
+        cut.Markup.Should().Contain("SKU AG-41-NG");
     }
 
     [Fact]

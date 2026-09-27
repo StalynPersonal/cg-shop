@@ -219,3 +219,23 @@ html, body {
     right: 0.75rem;
     top: 0.5rem;
 }
+
+/* Chips de variante (talla/color/presentación): el elegido va relleno con el color de la tienda. */
+.mud-chip.cg-variant-chip {
+    min-width: 48px;
+    justify-content: center;
+    font-weight: 500;
+    transition: background-color .15s, color .15s, box-shadow .15s;
+}
+
+.mud-chip.cg-variant-chip.selected,
+.mud-chip.cg-variant-chip.selected:hover {
+    background-color: var(--mud-palette-primary) !important;
+    border-color: var(--mud-palette-primary) !important;
+    color: var(--mud-palette-primary-text) !important;
+    box-shadow: 0 0 0 2px var(--mud-palette-primary-lighten);
+}
+
+.mud-chip.cg-variant-chip.mud-disabled {
+    text-decoration: line-through;
+}

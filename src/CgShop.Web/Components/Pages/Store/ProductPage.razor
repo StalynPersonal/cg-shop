@@ -41,7 +41,7 @@ else
                                     CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
                             @foreach (var s in _sizes)
                             {
-                                <MudChip T="string" Value="@s" Text="@s" Disabled="@(!IsAvailable(size: s))" />
+                                <MudChip T="string" Value="@s" Text="@s" Disabled="@(!IsAvailable(size: s))" Class="@ChipClass(s == _size)" data-testid="size-chip" />
                             }
                         </MudChipSet>
                     </div>
@@ -54,7 +54,7 @@ else
                                     CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
                             @foreach (var c in _colors)
                             {
-                                <MudChip T="string" Value="@c" Text="@c" Disabled="@(!IsAvailable(color: c))" />
+                                <MudChip T="string" Value="@c" Text="@c" Disabled="@(!IsAvailable(color: c))" Class="@ChipClass(c == _color)" data-testid="color-chip" />
                             }
                         </MudChipSet>
                     </div>
@@ -68,7 +68,7 @@ else
                                     Variant="Variant.Outlined">
                             @foreach (var v in _volumes)
                             {
-                                <MudChip T="string" Value="@v.ToString()" Text="@($"{v} ml")" />
+                                <MudChip T="string" Value="@v.ToString()" Text="@($"{v} ml")" Class="@ChipClass(v == _volume)" data-testid="volume-chip" />
                             }
                         </MudChipSet>
                     </div>
@@ -155,27 +155,46 @@ else
     private static List<string> CatalogServiceSizes(IEnumerable<string> sizes) =>
         sizes.Distinct().OrderBy(s => decimal.TryParse(s, out var n) ? n : decimal.MaxValue).ThenBy(s => s).ToList();
 
+    /// <summary>Una talla o color se puede elegir si tiene stock en alguna combinación; la otra dimensión se ajusta sola.</summary>
     private bool IsAvailable(string? size = null, string? color = null) =>
         _product!.Variants.Any(v => v.Available > 0 &&
                                     (size is null || v.Size == size) &&
-                                    (color is null || v.Color == color) &&
-                                    (size is not null || _size is null || v.Size == _size));
+                                    (color is null || v.Color == color));
+
+    private static string ChipClass(bool selected) => selected ? "cg-variant-chip selected" : "cg-variant-chip";
 
     private void SelectSize(string? size)
     {
+        if (size is null)
+            return;
         _size = size;
+        // Si el color actual no existe (o no tiene stock) en esta talla, se pasa al primero que sí.
+        if (_colors.Count > 0 && !HasStock(size, _color))
+            _color = BestMatch(v => v.Size == size)?.Color ?? _color;
         Resolve();
     }
 
     private void SelectColor(string? color)
     {
+        if (color is null)
+            return;
         _color = color;
+        if (_sizes.Count > 0 && !HasStock(_size, color))
+            _size = BestMatch(v => v.Color == color)?.Size ?? _size;
         Resolve();
     }
 
+    private bool HasStock(string? size, string? color) =>
+        _product!.Variants.Any(v => v.Size == size && v.Color == color && v.Available > 0);
+
+    private VariantDto? BestMatch(Func<VariantDto, bool> filter) =>
+        _product!.Variants.Where(filter).OrderByDescending(v => v.Available > 0).FirstOrDefault();
+
     private void SelectVolume(string? volume)
     {
-        _volume = int.TryParse(volume, out var v) ? v : null;
+        if (!int.TryParse(volume, out var v))
+            return;
+        _volume = v;
         Resolve();
     }
 
