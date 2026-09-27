@@ -1,0 +1,194 @@
+@page "/configuracion"
+@attribute [AdminHost]
+@attribute [Authorize(Policy = Policies.SuperAdmin)]
+@using CgShop.Application.Platform
+@using CgShop.Domain.Platform
+@inject IPlatformSettingsProvider Settings
+@inject ISnackbar Snackbar
+@inject IDialogService Dialogs
+
+<PageTitle>Configuración · Super Admin</PageTitle>
+<MudText Typo="Typo.h4">Configuración de la plataforma</MudText>
+<MudText Class="mud-text-secondary mb-4">
+    Parámetros que aplican a todas las tiendas. Los cambios se aplican de inmediato, sin reiniciar.
+</MudText>
+
+@if (_view is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    <MudAlert Severity="@(_view.IsCustomized ? Severity.Info : Severity.Normal)" Dense="true" Class="mb-4" data-testid="settings-origin">
+        @if (_view.IsCustomized)
+        {
+            <text>Última modificación por <b>@_view.UpdatedBy</b> el @Ui.Date(_view.UpdatedAtUtc!.Value).</text>
+        }
+        else
+        {
+            <text>Se usan los valores predeterminados (appsettings). Al guardar, quedarán registrados aquí.</text>
+        }
+    </MudAlert>
+
+    <MudForm @ref="_form" @bind-IsValid="_valid">
+        <MudGrid>
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4" Outlined="true" Style="height:100%">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.Receipt" Style="vertical-align:middle" /> Pedidos
+                    </MudText>
+                    <MudStack Spacing="3">
+                        <MudNumericField @bind-Value="_values.ReservationHours" Label="Horas de reserva de stock"
+                                         Min="L.ReservationHoursMin" Max="L.ReservationHoursMax" Variant="Variant.Outlined"
+                                         HelperText="@Help("Tiempo que se aparta el stock esperando el pago", _view.Defaults.ReservationHours, "h")" />
+                        <MudNumericField @bind-Value="_values.ExpiryCheckMinutes" Label="Revisar reservas vencidas cada (min)"
+                                         Min="L.ExpiryCheckMin" Max="L.ExpiryCheckMax" Variant="Variant.Outlined"
+                                         HelperText="@Help("Frecuencia del proceso que libera stock", _view.Defaults.ExpiryCheckMinutes, "min")" />
+                        <MudNumericField @bind-Value="_values.MaxReceiptMb" Label="Tamaño máximo del comprobante (MB)"
+                                         Min="L.FileMbMin" Max="L.FileMbMax" Variant="Variant.Outlined"
+                                         HelperText="@Help("JPG, PNG o PDF", _view.Defaults.MaxReceiptMb, "MB")" />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4" Outlined="true" Style="height:100%">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.PhotoLibrary" Style="vertical-align:middle" /> Fotos de productos
+                    </MudText>
+                    <MudStack Spacing="3">
+                        <MudNumericField @bind-Value="_values.MaxImageMb" Label="Tamaño máximo por foto (MB)"
+                                         Min="L.FileMbMin" Max="L.FileMbMax" Variant="Variant.Outlined"
+                                         HelperText="@Help(null, _view.Defaults.MaxImageMb, "MB")" />
+                        <MudNumericField @bind-Value="_values.MaxImagesPerProduct" Label="Fotos por producto"
+                                         Min="L.ImagesMin" Max="L.ImagesMax" Variant="Variant.Outlined"
+                                         HelperText="@Help(null, _view.Defaults.MaxImagesPerProduct, "")" />
+                        <MudNumericField @bind-Value="_values.MinImageDimension" Label="Lado mínimo (px)"
+                                         Min="L.DimensionMin" Max="L.DimensionMax" Variant="Variant.Outlined"
+                                         HelperText="@Help("Evita fotos borrosas", _view.Defaults.MinImageDimension, "px")" />
+                        <MudNumericField @bind-Value="_values.MaxImageDimension" Label="Lado máximo (px)"
+                                         Min="L.DimensionMin" Max="L.DimensionMax" Variant="Variant.Outlined"
+                                         HelperText="@Help(null, _view.Defaults.MaxImageDimension, "px")" />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+            <MudItem xs="12" md="4">
+                <MudPaper Class="pa-4" Outlined="true" Style="height:100%">
+                    <MudText Typo="Typo.h6" Class="mb-3">
+                        <MudIcon Icon="@Icons.Material.Filled.TimerOff" Style="vertical-align:middle" /> Sesión
+                    </MudText>
+                    <MudStack Spacing="3">
+                        <MudNumericField @bind-Value="_values.IdleTimeoutMinutes" Label="Cerrar sesión tras inactividad (min)"
+                                         Min="L.IdleMin" Max="L.IdleMax" Variant="Variant.Outlined"
+                                         HelperText="@Help("Aplica a todos los usuarios", _view.Defaults.IdleTimeoutMinutes, "min")" />
+                        <MudNumericField @bind-Value="_values.SessionWarningSeconds" Label="Avisar antes del cierre (s)"
+                                         Min="L.WarningMin" Max="L.WarningMax" Variant="Variant.Outlined"
+                                         HelperText="@Help(null, _view.Defaults.SessionWarningSeconds, "s")" />
+                    </MudStack>
+                </MudPaper>
+            </MudItem>
+        </MudGrid>
+    </MudForm>
+
+    <div class="cg-actions mt-4">
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" StartIcon="@Icons.Material.Filled.Save"
+                   OnClick="Save" Disabled="_saving" data-testid="save-settings">Guardar cambios</MudButton>
+        @if (_view.IsCustomized)
+        {
+            <MudButton Variant="Variant.Outlined" Color="Color.Default" StartIcon="@Icons.Material.Filled.Restore"
+                       OnClick="Reset" Disabled="_saving">Restaurar predeterminados</MudButton>
+        }
+    </div>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; } = default!;
+
+    private MudForm _form = default!;
+    private bool _valid;
+    private bool _saving;
+    private PlatformSettingsView? _view;
+    private EditableValues _values = new();
+
+    private static class L
+    {
+        public const int ReservationHoursMin = PlatformSettingsValues.Limits.ReservationHoursMin;
+        public const int ReservationHoursMax = PlatformSettingsValues.Limits.ReservationHoursMax;
+        public const int ExpiryCheckMin = PlatformSettingsValues.Limits.ExpiryCheckMin;
+        public const int ExpiryCheckMax = PlatformSettingsValues.Limits.ExpiryCheckMax;
+        public const int FileMbMin = PlatformSettingsValues.Limits.FileMbMin;
+        public const int FileMbMax = PlatformSettingsValues.Limits.FileMbMax;
+        public const int ImagesMin = PlatformSettingsValues.Limits.ImagesMin;
+        public const int ImagesMax = PlatformSettingsValues.Limits.ImagesMax;
+        public const int DimensionMin = PlatformSettingsValues.Limits.DimensionMin;
+        public const int DimensionMax = PlatformSettingsValues.Limits.DimensionMax;
+        public const int IdleMin = PlatformSettingsValues.Limits.IdleMin;
+        public const int IdleMax = PlatformSettingsValues.Limits.IdleMax;
+        public const int WarningMin = PlatformSettingsValues.Limits.WarningMin;
+        public const int WarningMax = PlatformSettingsValues.Limits.WarningMax;
+    }
+
+    /// <summary>Copia editable (los records son inmutables).</summary>
+    private sealed class EditableValues
+    {
+        public int ReservationHours { get; set; }
+        public int ExpiryCheckMinutes { get; set; }
+        public int MaxReceiptMb { get; set; }
+        public int MaxImageMb { get; set; }
+        public int MaxImagesPerProduct { get; set; }
+        public int MinImageDimension { get; set; }
+        public int MaxImageDimension { get; set; }
+        public int IdleTimeoutMinutes { get; set; }
+        public int SessionWarningSeconds { get; set; }
+
+        public static EditableValues From(PlatformSettingsValues v) => new()
+        {
+            ReservationHours = v.ReservationHours, ExpiryCheckMinutes = v.ExpiryCheckMinutes,
+            MaxReceiptMb = v.MaxReceiptMb, MaxImageMb = v.MaxImageMb, MaxImagesPerProduct = v.MaxImagesPerProduct,
+            MinImageDimension = v.MinImageDimension, MaxImageDimension = v.MaxImageDimension,
+            IdleTimeoutMinutes = v.IdleTimeoutMinutes, SessionWarningSeconds = v.SessionWarningSeconds
+        };
+
+        public PlatformSettingsValues ToValues() => new(ReservationHours, ExpiryCheckMinutes, MaxReceiptMb, MaxImageMb,
+            MaxImagesPerProduct, MinImageDimension, MaxImageDimension, IdleTimeoutMinutes, SessionWarningSeconds);
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _view = await Settings.GetAsync();
+        _values = EditableValues.From(_view.Values);
+    }
+
+    private static string Help(string? text, int defaultValue, string unit) =>
+        $"{(text is null ? "" : text + ". ")}Predeterminado: {defaultValue}{(unit.Length > 0 ? " " + unit : "")}";
+
+    private async Task Save()
+    {
+        var values = _values.ToValues();
+        var errors = values.Validate();
+        if (errors.Count > 0)
+        {
+            foreach (var e in errors) Snackbar.Add(e, Severity.Warning);
+            return;
+        }
+
+        _saving = true;
+        var actor = (await AuthState).User.ToActor();
+        if (await Snackbar.TryAsync(async () => _view = await Settings.UpdateAsync(values, actor),
+                "Configuración guardada. Se aplica de inmediato."))
+            _values = EditableValues.From(_view!.Values);
+        _saving = false;
+    }
+
+    private async Task Reset()
+    {
+        var confirmed = await Dialogs.ShowMessageBoxAsync("Restaurar predeterminados",
+            "Se volverá a los valores de appsettings para todas las tiendas.", "Restaurar", cancelText: "Cancelar");
+        if (confirmed != true)
+            return;
+        var actor = (await AuthState).User.ToActor();
+        if (await Snackbar.TryAsync(async () => _view = await Settings.ResetAsync(actor), "Valores predeterminados restaurados."))
+            _values = EditableValues.From(_view!.Values);
+    }
+}

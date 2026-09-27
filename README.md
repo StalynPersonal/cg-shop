@@ -174,6 +174,22 @@ dotnet test tests/CgShop.IntegrationTests
 
 ---
 
+### Configuración de la plataforma (Super Admin)
+
+En **admin.localhost → Configuración** (`/configuracion`) el Super Admin ajusta, **sin reiniciar**:
+
+| Sección | Parámetros |
+|---|---|
+| Pedidos | horas de reserva de stock, frecuencia de revisión de reservas vencidas, MB máx. del comprobante |
+| Fotos de productos | MB máx. por foto, fotos por producto, lado mínimo y máximo (px) |
+| Sesión | minutos de inactividad antes de cerrar sesión, segundos de aviso |
+
+Los valores se guardan en la tabla `PlatformSettings` con quién los cambió y cuándo. Mientras no se guarden,
+se usan las secciones `Orders`, `Catalog` y `Session` de `appsettings.json` como **predeterminados**, que se pueden
+restaurar desde la misma pantalla. API: `GET/PUT/DELETE /api/superadmin/settings`.
+
+Siguen solo en `appsettings` (infraestructura o secretos): la cadena de conexión, `Tenancy`, `FileStorage`, `Jwt` y `Jobs`.
+
 ### Cierre de sesión por inactividad
 
 Tras **15 minutos sin actividad** (mouse, teclado, toque o scroll) la sesión se cierra sola.

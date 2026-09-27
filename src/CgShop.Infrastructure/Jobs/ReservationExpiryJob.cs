@@ -16,8 +16,7 @@ public sealed class ReservationExpiryJob(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromMinutes(Math.Max(1, options.Value.ExpiryCheckMinutes)));
-        do
+        while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
@@ -30,6 +29,9 @@ public sealed class ReservationExpiryJob(
             {
                 logger.LogError(ex, "Error en el job de expiración de reservas");
             }
-        } while (await timer.WaitForNextTickAsync(stoppingToken));
+
+            // La frecuencia se lee en cada vuelta: un cambio del Super Admin aplica sin reiniciar.
+            await Task.Delay(TimeSpan.FromMinutes(Math.Max(1, options.Value.ExpiryCheckMinutes)), stoppingToken);
+        }
     }
 }

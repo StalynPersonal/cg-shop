@@ -1,3 +1,6 @@
+using CgShop.Application.Platform;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Options;
 using CgShop.Domain.Common;
 using CgShop.Infrastructure;
 using CgShop.Infrastructure.Persistence;
@@ -33,11 +36,18 @@ builder.Services.AddAuthentication(o =>
         o.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     })
     .AddIdentityCookies();
-// Cierre por inactividad: la cookie vence tras N minutos sin renovarse (configurable en "Session").
-// En el navegador, SessionTimeoutGuard la renueva solo mientras hay actividad real del usuario.
-builder.Services.Configure<SessionTimeoutOptions>(builder.Configuration.GetSection(SessionTimeoutOptions.Section));
-var sessionOptions = builder.Configuration.GetSection(SessionTimeoutOptions.Section).Get<SessionTimeoutOptions>()
-                     ?? new SessionTimeoutOptions();
+// Cierre por inactividad: los minutos los define el Super Admin (appsettings "Session" = predeterminado).
+// - Navegador: SessionTimeoutGuard avisa, cierra y renueva la cookie solo con actividad real.
+// - Servidor: la cookie se rechaza si pasó más tiempo sin renovarse que el configurado (SessionIdlePolicy).
+builder.Services.AddSingleton<IOptions<SessionTimeoutOptions>>(sp =>
+{
+    var provider = sp.GetRequiredService<IPlatformSettingsProvider>();
+    return new LiveOptions<SessionTimeoutOptions>(() => new SessionTimeoutOptions
+    {
+        IdleTimeoutMinutes = provider.Current.IdleTimeoutMinutes,
+        WarningSeconds = provider.Current.SessionWarningSeconds
+    });
+});
 builder.Services.ConfigureApplicationCookie(o =>
 {
     o.Cookie.Name = "cgshop.auth";
@@ -46,7 +56,17 @@ builder.Services.ConfigureApplicationCookie(o =>
     o.LoginPath = "/cuenta/login";
     o.AccessDeniedPath = "/cuenta/acceso-denegado";
     o.SlidingExpiration = true;
-    o.ExpireTimeSpan = sessionOptions.IdleTimeout;
+    o.ExpireTimeSpan = SessionIdlePolicy.MaxCookieLifetime; // tope; la inactividad se valida abajo
+    o.Events.OnValidatePrincipal = async context =>
+    {
+        var idle = context.HttpContext.RequestServices.GetRequiredService<IOptions<SessionTimeoutOptions>>()
+            .Value.IdleTimeout;
+        if (SessionIdlePolicy.IsExpired(context.Properties.IssuedUtc, DateTimeOffset.UtcNow, idle))
+        {
+            context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
+        }
+    };
 });
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(Policies.TenantStaff, p => p.RequireRole(Roles.TenantAdmin, Roles.TenantStaff))

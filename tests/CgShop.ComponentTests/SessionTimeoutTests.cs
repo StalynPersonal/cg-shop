@@ -5,12 +5,52 @@ using CgShop.Web.Components.Shared;
 using CgShop.Web.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
 namespace CgShop.ComponentTests;
+
+/// <summary>Proveedor de configuración en memoria para pruebas del host.</summary>
+public sealed class FakePlatformSettings : CgShop.Application.Platform.IPlatformSettingsProvider
+{
+    public CgShop.Domain.Platform.PlatformSettingsValues Values { get; set; } = new(48, 10, 5, 5, 10, 300, 6000, 15, 60);
+
+    public CgShop.Domain.Platform.PlatformSettingsValues Current => Values;
+
+    public Task<CgShop.Application.Platform.PlatformSettingsView> GetAsync(CancellationToken ct = default) =>
+        Task.FromResult(new CgShop.Application.Platform.PlatformSettingsView(Values, Values, false, null, null));
+
+    public Task<CgShop.Application.Platform.PlatformSettingsView> UpdateAsync(
+        CgShop.Domain.Platform.PlatformSettingsValues values, CgShop.Domain.Common.ActorInfo actor,
+        CancellationToken ct = default)
+    {
+        Values = values;
+        return GetAsync(ct);
+    }
+
+    public Task<CgShop.Application.Platform.PlatformSettingsView> ResetAsync(CgShop.Domain.Common.ActorInfo actor,
+        CancellationToken ct = default) => GetAsync(ct);
+}
+
+public sealed class SessionIdlePolicyTests
+{
+    [Fact]
+    public void Session_expires_only_after_idle_minutes_for_100_configurations()
+    {
+        var issued = new DateTimeOffset(2026, 9, 27, 12, 0, 0, TimeSpan.Zero);
+        for (var minutes = 1; minutes <= TestData.BatchSize; minutes++)
+        {
+            var idle = TimeSpan.FromMinutes(minutes);
+            SessionIdlePolicy.IsExpired(issued, issued + idle - TimeSpan.FromSeconds(1), idle).Should().BeFalse();
+            SessionIdlePolicy.IsExpired(issued, issued + idle + TimeSpan.FromSeconds(1), idle).Should().BeTrue();
+        }
+
+        SessionIdlePolicy.IsExpired(null, issued, TimeSpan.FromMinutes(1)).Should().BeFalse();
+    }
+}
 
 public sealed class SessionTimeoutOptionsTests
 {
@@ -100,22 +140,32 @@ public sealed class SessionTimeoutHostTests : IClassFixture<SessionTimeoutHostTe
 
     public sealed class WebFactory : WebApplicationFactory<Program>
     {
+        public FakePlatformSettings Settings { get; } = new();
+
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
-            builder.UseSetting("Session:IdleTimeoutMinutes", "7");
             builder.UseSetting("Jobs:Enabled", "false");
+            builder.ConfigureTestServices(services =>
+                services.AddSingleton<CgShop.Application.Platform.IPlatformSettingsProvider>(Settings));
         }
     }
 
     [Fact]
-    public void Auth_cookie_expires_after_configured_idle_minutes_with_sliding_renewal()
+    public void Idle_timeout_comes_from_platform_settings_and_changes_without_restart()
     {
         var cookie = _factory.Services.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>()
             .Get(IdentityConstants.ApplicationScheme);
-
-        cookie.ExpireTimeSpan.Should().Be(TimeSpan.FromMinutes(7));
+        cookie.ExpireTimeSpan.Should().Be(SessionIdlePolicy.MaxCookieLifetime);
         cookie.SlidingExpiration.Should().BeTrue();
+        cookie.Events.OnValidatePrincipal.Should().NotBeNull();
+
+        var options = _factory.Services.GetRequiredService<IOptions<SessionTimeoutOptions>>();
+        _factory.Settings.Values = _factory.Settings.Values with { IdleTimeoutMinutes = 7 };
+        options.Value.IdleTimeout.Should().Be(TimeSpan.FromMinutes(7));
+
+        _factory.Settings.Values = _factory.Settings.Values with { IdleTimeoutMinutes = 30 };
+        options.Value.IdleTimeout.Should().Be(TimeSpan.FromMinutes(30)); // sin reiniciar
     }
 
     [Fact]

@@ -6,6 +6,9 @@ using CgShop.Infrastructure.Identity;
 using CgShop.Infrastructure.Jobs;
 using CgShop.Infrastructure.Notifications;
 using CgShop.Infrastructure.Persistence;
+using CgShop.Infrastructure.Platform;
+using CgShop.Application.Platform;
+using Microsoft.Extensions.Options;
 using CgShop.Infrastructure.Tenancy;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
@@ -25,9 +28,25 @@ public static class DependencyInjection
 
         services.AddApplication();
         services.Configure<TenantResolutionOptions>(configuration.GetSection(TenantResolutionOptions.Section));
-        services.Configure<OrderOptions>(configuration.GetSection(OrderOptions.Section));
-        services.Configure<CgShop.Application.Catalog.CatalogOptions>(configuration.GetSection(CgShop.Application.Catalog.CatalogOptions.Section));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.Section));
+
+        // Parámetros de negocio editables por el Super Admin (appsettings = valores predeterminados).
+        // Los IOptions de pedidos y catálogo leen el valor vigente en cada uso.
+        services.AddSingleton<IDbContextFactoryAdapter>(new PlatformDbContextFactory(connectionString));
+        services.AddSingleton<IPlatformSettingsProvider>(sp => new PlatformSettingsStore(
+            sp.GetRequiredService<IDbContextFactoryAdapter>(), sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
+            configuration, sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PlatformSettingsStore>>()));
+        services.AddSingleton<IOptions<OrderOptions>>(sp =>
+        {
+            var provider = sp.GetRequiredService<IPlatformSettingsProvider>();
+            return new LiveOptions<OrderOptions>(() => provider.Current.ToOrderOptions());
+        });
+        services.AddSingleton<IOptions<CgShop.Application.Catalog.CatalogOptions>>(sp =>
+        {
+            var provider = sp.GetRequiredService<IPlatformSettingsProvider>();
+            return new LiveOptions<CgShop.Application.Catalog.CatalogOptions>(() => provider.Current.ToCatalogOptions());
+        });
 
         // Tenancy: un TenantContext por scope (petición HTTP o circuito Blazor).
         services.AddScoped<TenantContext>();

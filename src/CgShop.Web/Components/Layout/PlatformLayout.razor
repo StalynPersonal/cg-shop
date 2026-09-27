@@ -18,10 +18,13 @@
                 <MudHidden Breakpoint="Breakpoint.SmAndDown">
                     <MudButton Href="/" Color="Color.Inherit" Class="ml-6">Empresas</MudButton>
                     <MudButton Href="/empresas/nueva" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AddBusiness">Nueva empresa</MudButton>
+                    <MudButton Href="/configuracion" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Settings">Configuración</MudButton>
                 </MudHidden>
                 <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
                     <MudIconButton Href="/empresas/nueva" Color="Color.Inherit" Icon="@Icons.Material.Filled.AddBusiness"
                                    aria-label="Nueva empresa" />
+                    <MudIconButton Href="/configuracion" Color="Color.Inherit" Icon="@Icons.Material.Filled.Settings"
+                                   aria-label="Configuración" />
                 </MudHidden>
             </AuthorizeView>
         }

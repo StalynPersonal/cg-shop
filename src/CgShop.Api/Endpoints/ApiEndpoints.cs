@@ -273,6 +273,16 @@ public static class SuperAdminEndpoints
 
         group.MapGet("/stats", (SuperAdminTenantService tenants, CancellationToken ct) => tenants.GetStatsAsync(ct));
 
+        group.MapGet("/settings", (CgShop.Application.Platform.IPlatformSettingsProvider settings, CancellationToken ct) =>
+            settings.GetAsync(ct));
+
+        group.MapPut("/settings", (CgShop.Domain.Platform.PlatformSettingsValues values,
+                CgShop.Application.Platform.IPlatformSettingsProvider settings, HttpContext http, CancellationToken ct) =>
+            settings.UpdateAsync(values, http.User.ToActor(), ct));
+
+        group.MapDelete("/settings", (CgShop.Application.Platform.IPlatformSettingsProvider settings, HttpContext http,
+            CancellationToken ct) => settings.ResetAsync(http.User.ToActor(), ct));
+
         group.MapPost("/tenants", async (CreateTenantRequest request, SuperAdminTenantService tenants, HttpContext http,
             CancellationToken ct) =>
         {
