@@ -52,7 +52,6 @@ public sealed class SqlServerFixture : IAsyncLifetime
         {
             ["ConnectionStrings:Default"] = connectionString,
             ["FileStorage:RootPath"] = uploadsPath,
-            ["Orders:ReservationHours"] = "48"
         }).Build();
 
         var services = new ServiceCollection();

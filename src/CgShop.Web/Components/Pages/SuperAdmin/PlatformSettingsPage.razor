@@ -26,7 +26,7 @@ else
         }
         else
         {
-            <text>Se usan los valores predeterminados (appsettings). Al guardar, quedarán registrados aquí.</text>
+            <text>Se usan los valores predeterminados. Al guardar, quedarán registrados aquí.</text>
         }
     </MudAlert>
 
@@ -184,7 +184,7 @@ else
     private async Task Reset()
     {
         var confirmed = await Dialogs.ShowMessageBoxAsync("Restaurar predeterminados",
-            "Se volverá a los valores de appsettings para todas las tiendas.", "Restaurar", cancelText: "Cancelar");
+            "Se volverá a los valores predeterminados para todas las tiendas.", "Restaurar", cancelText: "Cancelar");
         if (confirmed != true)
             return;
         var actor = (await AuthState).User.ToActor();

@@ -4,7 +4,7 @@ namespace CgShop.Domain.Platform;
 
 /// <summary>
 /// Parámetros de negocio de toda la plataforma, editables por el Super Admin (fila única).
-/// Los valores de appsettings actúan como predeterminados mientras no se guarde esta configuración.
+/// Mientras no se guarde, rigen los valores predeterminados de fábrica.
 /// </summary>
 public sealed class PlatformSettings
 {

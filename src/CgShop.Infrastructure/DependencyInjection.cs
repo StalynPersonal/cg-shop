@@ -30,12 +30,12 @@ public static class DependencyInjection
         services.Configure<TenantResolutionOptions>(configuration.GetSection(TenantResolutionOptions.Section));
         services.Configure<FileStorageOptions>(configuration.GetSection(FileStorageOptions.Section));
 
-        // Parámetros de negocio editables por el Super Admin (appsettings = valores predeterminados).
+        // Parámetros de negocio editables por el Super Admin (con valores predeterminados de fábrica).
         // Los IOptions de pedidos y catálogo leen el valor vigente en cada uso.
         services.AddSingleton<IDbContextFactoryAdapter>(new PlatformDbContextFactory(connectionString));
         services.AddSingleton<IPlatformSettingsProvider>(sp => new PlatformSettingsStore(
             sp.GetRequiredService<IDbContextFactoryAdapter>(), sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>(),
-            configuration, sp.GetRequiredService<TimeProvider>(),
+            sp.GetRequiredService<TimeProvider>(),
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PlatformSettingsStore>>()));
         services.AddSingleton<IOptions<OrderOptions>>(sp =>
         {

@@ -5,8 +5,6 @@ namespace CgShop.Application.Catalog;
 
 public sealed class CatalogOptions
 {
-    public const string Section = "Catalog";
-
     /// <summary>Tamaño máximo por foto de producto (bytes). Por defecto 5 MB.</summary>
     public long MaxImageBytes { get; set; } = 5 * 1024 * 1024;
 

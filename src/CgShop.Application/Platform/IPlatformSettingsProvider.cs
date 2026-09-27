@@ -14,7 +14,7 @@ public sealed record PlatformSettingsView(
 
 /// <summary>
 /// Configuración de negocio vigente (editable por el Super Admin, con caché).
-/// Si nunca se guardó, usa los valores de appsettings como predeterminados.
+/// Si nunca se guardó, usa los valores predeterminados de fábrica.
 /// </summary>
 public interface IPlatformSettingsProvider
 {
@@ -25,7 +25,7 @@ public interface IPlatformSettingsProvider
 
     Task<PlatformSettingsView> UpdateAsync(PlatformSettingsValues values, ActorInfo actor, CancellationToken ct = default);
 
-    /// <summary>Vuelve a los valores predeterminados de appsettings.</summary>
+    /// <summary>Vuelve a los valores predeterminados de fábrica.</summary>
     Task<PlatformSettingsView> ResetAsync(ActorInfo actor, CancellationToken ct = default);
 }
 
@@ -48,7 +48,7 @@ public static class PlatformSettingsMapping
         MaxImageDimension = v.MaxImageDimension
     };
 
-    /// <summary>Predeterminados a partir de las secciones de appsettings.</summary>
+    /// <summary>Valores a partir de las opciones de pedidos, catálogo y sesión.</summary>
     public static PlatformSettingsValues FromOptions(OrderOptions orders, CatalogOptions catalog, int idleMinutes,
         int warningSeconds) =>
         new((int)orders.ReservationHours, orders.ExpiryCheckMinutes, (int)Math.Max(1, orders.MaxReceiptBytes / Mb),

@@ -71,8 +71,6 @@ public sealed record PagedResult<T>(IReadOnlyList<T> Items, int TotalCount, int 
 
 public sealed class OrderOptions
 {
-    public const string Section = "Orders";
-
     /// <summary>Horas que se aparta el stock mientras se valida el pago.</summary>
     public int ReservationHours { get; set; } = 48;
 

@@ -6,7 +6,6 @@ using CgShop.Domain.Platform;
 using CgShop.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace CgShop.Infrastructure.Platform;
@@ -18,14 +17,15 @@ namespace CgShop.Infrastructure.Platform;
 public sealed class PlatformSettingsStore(
     IDbContextFactoryAdapter dbFactory,
     IMemoryCache cache,
-    IConfiguration configuration,
     TimeProvider clock,
     ILogger<PlatformSettingsStore> logger) : IPlatformSettingsProvider
 {
     private const string CacheKey = "platform:settings";
     private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(1);
 
-    public PlatformSettingsValues Defaults { get; } = ReadDefaults(configuration);
+    /// <summary>Valores predeterminados de fábrica (se usan mientras el Super Admin no guarde otros).</summary>
+    public PlatformSettingsValues Defaults { get; } = PlatformSettingsMapping.FromOptions(
+        new OrderOptions(), new CatalogOptions(), idleMinutes: 15, warningSeconds: 60);
 
     public PlatformSettingsValues Current =>
         cache.GetOrCreate(CacheKey, entry =>
@@ -86,14 +86,6 @@ public sealed class PlatformSettingsStore(
     private PlatformSettingsView ToView(PlatformSettings? row) =>
         new(row?.ToValues() ?? Defaults, Defaults, row is not null, row?.UpdatedAtUtc, row?.UpdatedBy);
 
-    private static PlatformSettingsValues ReadDefaults(IConfiguration configuration)
-    {
-        var orders = configuration.GetSection(OrderOptions.Section).Get<OrderOptions>() ?? new OrderOptions();
-        var catalog = configuration.GetSection(CatalogOptions.Section).Get<CatalogOptions>() ?? new CatalogOptions();
-        var idle = configuration.GetValue("Session:IdleTimeoutMinutes", 15);
-        var warning = configuration.GetValue("Session:WarningSeconds", 60);
-        return PlatformSettingsMapping.FromOptions(orders, catalog, idle, warning);
-    }
 }
 
 /// <summary>Crea contextos sin tenant para datos globales de la plataforma.</summary>

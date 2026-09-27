@@ -184,9 +184,10 @@ En **admin.localhost → Configuración** (`/configuracion`) el Super Admin ajus
 | Fotos de productos | MB máx. por foto, fotos por producto, lado mínimo y máximo (px) |
 | Sesión | minutos de inactividad antes de cerrar sesión, segundos de aviso |
 
-Los valores se guardan en la tabla `PlatformSettings` con quién los cambió y cuándo. Mientras no se guarden,
-se usan las secciones `Orders`, `Catalog` y `Session` de `appsettings.json` como **predeterminados**, que se pueden
-restaurar desde la misma pantalla. API: `GET/PUT/DELETE /api/superadmin/settings`.
+Los valores se guardan en la tabla `PlatformSettings` con quién los cambió y cuándo. Mientras no se guarden, rigen los
+**predeterminados de fábrica** (48 h de reserva, revisión cada 10 min, comprobantes y fotos de 5 MB, 10 fotos por producto,
+300–6000 px, cierre tras 15 min con aviso de 60 s), que se pueden restaurar desde la misma pantalla.
+Estos parámetros **no** están en `appsettings.json`. API: `GET/PUT/DELETE /api/superadmin/settings`.
 
 Siguen solo en `appsettings` (infraestructura o secretos): la cadena de conexión, `Tenancy`, `FileStorage`, `Jwt` y `Jobs`.
 
@@ -194,12 +195,9 @@ Siguen solo en `appsettings` (infraestructura o secretos): la cadena de conexió
 
 Tras **15 minutos sin actividad** (mouse, teclado, toque o scroll) la sesión se cierra sola.
 Un minuto antes aparece un aviso con cuenta regresiva y el botón "Seguir conectado".
-La actividad se comparte entre pestañas. El servidor también aplica el plazo: la cookie vence si no se renueva,
-y solo se renueva mientras hay actividad real. Se configura en `src/CgShop.Web/appsettings.json`:
-
-```json
-"Session": { "IdleTimeoutMinutes": 15, "WarningSeconds": 60 }
-```
+La actividad se comparte entre pestañas. El servidor también aplica el plazo: la cookie se rechaza si no se renovó
+dentro de los minutos configurados, y solo se renueva mientras hay actividad real. Los minutos se ajustan en
+**Configuración** del Super Admin.
 
 Prueba de la lógica del navegador: `node tests/js/session-timeout.sim.js`.
 

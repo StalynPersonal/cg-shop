@@ -1,10 +1,8 @@
 namespace CgShop.Web.Services;
 
-/// <summary>Cierre de sesión por inactividad (sección "Session" de appsettings).</summary>
+/// <summary>Cierre de sesión por inactividad (valores de la configuración de la plataforma).</summary>
 public sealed class SessionTimeoutOptions
 {
-    public const string Section = "Session";
-
     /// <summary>Minutos sin actividad tras los cuales se cierra la sesión. Por defecto 15.</summary>
     public int IdleTimeoutMinutes { get; set; } = 15;
 

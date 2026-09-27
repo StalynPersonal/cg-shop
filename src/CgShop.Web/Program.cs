@@ -36,7 +36,7 @@ builder.Services.AddAuthentication(o =>
         o.DefaultSignInScheme = IdentityConstants.ExternalScheme;
     })
     .AddIdentityCookies();
-// Cierre por inactividad: los minutos los define el Super Admin (appsettings "Session" = predeterminado).
+// Cierre por inactividad: los minutos los define el Super Admin en la configuración de la plataforma.
 // - Navegador: SessionTimeoutGuard avisa, cierra y renueva la cookie solo con actividad real.
 // - Servidor: la cookie se rechaza si pasó más tiempo sin renovarse que el configurado (SessionIdlePolicy).
 builder.Services.AddSingleton<IOptions<SessionTimeoutOptions>>(sp =>
