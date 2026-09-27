@@ -12,8 +12,9 @@
              QuickFilter="QuickFilter" RowsPerPage="50" SortMode="SortMode.Single">
     <ToolBarContent>
         <MudStack Row="true" Spacing="3" Style="width:100%" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
-            <MudTextField @bind-Value="_search" Placeholder="SKU o producto" Adornment="Adornment.Start" Immediate="true"
-                          AdornmentIcon="@Icons.Material.Filled.Search" Style="min-width:240px" />
+            <MudTextField @bind-Value="_search" Label="Buscar" Placeholder="SKU o producto" Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Adornment="Adornment.Start" Immediate="true"
+                          AdornmentIcon="@Icons.Material.Filled.Search" Class="cg-toolbar-search" />
             <MudSwitch T="bool" @bind-Value="_lowOnly" Color="Color.Warning" Label="Solo poco stock (≤ 5)" />
             <MudSpacer />
             <MudButton StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync">Actualizar</MudButton>

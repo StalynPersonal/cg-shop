@@ -16,11 +16,11 @@
              RowsPerPage="50" data-testid="movements-grid">
     <ToolBarContent>
         <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center">
-            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="SKU, producto, usuario, pedido o motivo"
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Label="Buscar" Placeholder="SKU, producto, usuario, pedido o motivo" Variant="Variant.Outlined" Margin="Margin.Dense"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
-                          Style="min-width:280px" />
-            <MudSelect T="StockMovementType?" Value="_type" ValueChanged="OnType" Label="Tipo" Clearable="true"
-                       Style="max-width:260px">
+                          Class="cg-toolbar-search" />
+            <MudSelect T="StockMovementType?" Value="_type" ValueChanged="OnType" Label="Tipo" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Class="cg-toolbar-filter">
                 @foreach (var t in Enum.GetValues<StockMovementType>())
                 {
                     <MudSelectItem T="StockMovementType?" Value="t">@t.DisplayName()</MudSelectItem>

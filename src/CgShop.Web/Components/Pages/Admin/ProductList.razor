@@ -11,12 +11,12 @@
 <MudDataGrid T="ProductAdminRowDto" @ref="_grid" ServerData="LoadServerData" Hover="true" Dense="true" Elevation="1"
              RowsPerPage="25">
     <ToolBarContent>
-        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap">
-            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="Nombre, marca o SKU"
+        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Label="Buscar" Placeholder="Nombre, marca o SKU" Variant="Variant.Outlined" Margin="Margin.Dense"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
-                          Style="min-width:260px" />
-            <MudSelect T="ProductCategory?" Value="_category" ValueChanged="OnCategory" Label="Categoría" Clearable="true"
-                       Style="max-width:240px">
+                          Class="cg-toolbar-search" />
+            <MudSelect T="ProductCategory?" Value="_category" ValueChanged="OnCategory" Label="Categoría" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Class="cg-toolbar-filter">
                 @foreach (var c in Enum.GetValues<ProductCategory>())
                 {
                     <MudSelectItem T="ProductCategory?" Value="c">@c.DisplayName()</MudSelectItem>

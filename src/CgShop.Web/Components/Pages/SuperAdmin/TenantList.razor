@@ -25,7 +25,8 @@
              QuickFilter="QuickFilter" RowClick="@(e => Navigation.NavigateTo($"/empresas/{e.Item.Id}"))"
              RowStyle="cursor:pointer" Elevation="1">
     <ToolBarContent>
-        <MudTextField @bind-Value="_search" Placeholder="Buscar por nombre o subdominio" Adornment="Adornment.Start"
+        <MudTextField @bind-Value="_search" Label="Buscar" Placeholder="Nombre o subdominio" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mt-0" />
     </ToolBarContent>
     <Columns>

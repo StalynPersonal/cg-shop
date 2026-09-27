@@ -8,12 +8,12 @@
              RowClick="@(e => Navigation.NavigateTo($"/admin/pedidos/{e.Item.Id}"))" RowStyle="cursor:pointer"
              RowsPerPage="25">
     <ToolBarContent>
-        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap">
-            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="Número, cliente o correo"
+        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Label="Buscar" Placeholder="Número, cliente o correo" Variant="Variant.Outlined" Margin="Margin.Dense"
                           Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
-                          Style="min-width:260px" />
-            <MudSelect T="OrderStatus?" Value="_status" ValueChanged="OnStatus" Label="Estado" Clearable="true"
-                       Style="max-width:280px">
+                          Class="cg-toolbar-search" />
+            <MudSelect T="OrderStatus?" Value="_status" ValueChanged="OnStatus" Label="Estado" Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Class="cg-toolbar-filter">
                 @foreach (var s in Enum.GetValues<OrderStatus>())
                 {
                     <MudSelectItem T="OrderStatus?" Value="s">@s.DisplayName()</MudSelectItem>

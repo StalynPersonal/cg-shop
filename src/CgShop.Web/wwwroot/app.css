@@ -372,3 +372,11 @@ html, body {
     .cg-hero-caption { padding-bottom: 48px; }
     .cg-hero-caption .mud-button-root { padding: 4px 12px; font-size: .8rem; }
 }
+
+/* Barra de filtros de las tablas del panel: buscador flexible + filtros de ancho fijo, alineados. */
+.cg-toolbar-search { flex: 1 1 320px; min-width: 240px; }
+.cg-toolbar-filter { flex: 0 1 240px; min-width: 180px; }
+
+@media (max-width: 600px) {
+    .cg-toolbar-search, .cg-toolbar-filter { flex-basis: 100%; }
+}
