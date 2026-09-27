@@ -80,6 +80,14 @@ public sealed class SessionTimeoutGuardTests : MudTestContext
         cut.FindAll("[data-testid='session-warning']").Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Disposing_after_prerender_does_not_call_javascript()
+    {
+        // En el prerender (render estático) nunca corre OnAfterRender: desechar no debe invocar JS.
+        var guard = new SessionTimeoutGuard();
+        await guard.Invoking(g => g.DisposeAsync().AsTask()).Should().NotThrowAsync();
+    }
+
     private sealed class MudTestContextImpl : MudTestContext;
 }
 

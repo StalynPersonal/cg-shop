@@ -66,6 +66,11 @@
 
     public async ValueTask DisposeAsync()
     {
+        // En el prerender (render estático) nunca se inició el seguimiento: no hay nada que detener
+        // y llamar a JS lanzaría una excepción.
+        if (_ref is null)
+            return;
+
         try
         {
             await JS.InvokeVoidAsync("cgSession.stop");
@@ -75,6 +80,6 @@
             // el circuito ya se cerró
         }
 
-        _ref?.Dispose();
+        _ref.Dispose();
     }
 }
