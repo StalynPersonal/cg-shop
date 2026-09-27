@@ -73,6 +73,8 @@ public abstract class StoreTestContext : MudTestContext
 
     protected AppDbContext CreateDb() => new(_dbOptions, TenantContext);
 
+    internal AppDbContext CreateDbPublic() => CreateDb();
+
     protected ActorInfo Admin => TestData.TenantAdmin;
 
     protected async Task SeedProductsAsync(int count = TestData.BatchSize, int stock = 50)

@@ -1,0 +1,134 @@
+@page "/admin/inventario/movimientos"
+@attribute [Authorize(Policy = Policies.TenantAdmin)]
+@inject ProductAdminService Products
+
+<PageTitle>Movimientos de inventario · @Host.Tenant?.Name</PageTitle>
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-1">
+    <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="/admin/inventario" aria-label="Volver" />
+    <MudText Typo="Typo.h4">Movimientos de inventario</MudText>
+</MudStack>
+<MudText Color="Color.Secondary" Class="mb-4">
+    Historial inalterable de cada cambio de stock: quién lo hizo, cuándo, cuánto y por qué.
+    Solo visible para el propietario de la tienda.
+</MudText>
+
+<MudDataGrid T="StockMovementDto" @ref="_grid" ServerData="LoadServerData" Dense="true" Hover="true" Elevation="1"
+             RowsPerPage="50" data-testid="movements-grid">
+    <ToolBarContent>
+        <MudStack Row="true" Spacing="2" Style="width:100%" Wrap="Wrap.Wrap" AlignItems="AlignItems.Center">
+            <MudTextField T="string" Value="_search" ValueChanged="OnSearch" Placeholder="SKU, producto, usuario, pedido o motivo"
+                          Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" DebounceInterval="400"
+                          Style="min-width:280px" />
+            <MudSelect T="StockMovementType?" Value="_type" ValueChanged="OnType" Label="Tipo" Clearable="true"
+                       Style="max-width:260px">
+                @foreach (var t in Enum.GetValues<StockMovementType>())
+                {
+                    <MudSelectItem T="StockMovementType?" Value="t">@t.DisplayName()</MudSelectItem>
+                }
+            </MudSelect>
+            @if (_variantId is not null)
+            {
+                <MudChip T="string" OnClose="ClearVariant" Color="Color.Primary" Variant="Variant.Outlined">
+                    Solo una variante
+                </MudChip>
+            }
+        </MudStack>
+    </ToolBarContent>
+    <Columns>
+        <TemplateColumn Title="Fecha" Sortable="false">
+            <CellTemplate>@Ui.Date(context.Item.CreatedAtUtc)</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Producto" Sortable="false">
+            <CellTemplate>
+                <b>@context.Item.Sku</b><br /><small>@context.Item.ProductName</small>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Tipo" Sortable="false">
+            <CellTemplate>
+                <MudChip T="string" Size="Size.Small" Color="@TypeColor(context.Item.Type)" data-testid="movement-type">
+                    @context.Item.Type.DisplayName()
+                </MudChip>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Cantidad" Sortable="false">
+            <CellTemplate>
+                <MudText Color="@(context.Item.Quantity > 0 ? Color.Success : Color.Error)" data-testid="movement-qty">
+                    <b>@(context.Item.Quantity > 0 ? "+" : "")@context.Item.Quantity</b>
+                </MudText>
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Stock" Sortable="false">
+            <CellTemplate>@context.Item.StockBefore → @context.Item.StockAfter</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Motivo / pedido" Sortable="false">
+            <CellTemplate>
+                @context.Item.Reason
+                @if (context.Item.OrderNumber is not null)
+                {
+                    <br /><small>Pedido #@context.Item.OrderNumber</small>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Usuario" Sortable="false">
+            <CellTemplate>
+                @context.Item.UserName
+                @if (context.Item.UserRole == Roles.TenantStaff)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Outlined">Empleado</MudChip>
+                }
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <NoRecordsContent><MudText>No hay movimientos con estos filtros.</MudText></NoRecordsContent>
+    <PagerContent><MudDataGridPager T="StockMovementDto" /></PagerContent>
+</MudDataGrid>
+
+@code {
+    [SupplyParameterFromQuery(Name = "tipo")] public string? TypeQuery { get; set; }
+    [SupplyParameterFromQuery(Name = "variante")] public Guid? VariantQuery { get; set; }
+
+    private MudDataGrid<StockMovementDto> _grid = default!;
+    private string? _search;
+    private StockMovementType? _type;
+    private Guid? _variantId;
+
+    protected override void OnParametersSet()
+    {
+        if (Enum.TryParse<StockMovementType>(TypeQuery, out var t))
+            _type = t;
+        _variantId = VariantQuery;
+    }
+
+    private async Task<GridData<StockMovementDto>> LoadServerData(GridState<StockMovementDto> state, CancellationToken ct)
+    {
+        var result = await Products.GetMovementsAsync(
+            new StockMovementQuery(_type, _variantId, _search, Page: state.Page + 1, PageSize: state.PageSize), Actor, ct);
+        return new GridData<StockMovementDto> { Items = result.Items, TotalItems = result.TotalCount };
+    }
+
+    private Task OnSearch(string? value)
+    {
+        _search = value;
+        return _grid.ReloadServerData();
+    }
+
+    private Task OnType(StockMovementType? value)
+    {
+        _type = value;
+        return _grid.ReloadServerData();
+    }
+
+    private Task ClearVariant()
+    {
+        _variantId = null;
+        return _grid.ReloadServerData();
+    }
+
+    private static Color TypeColor(StockMovementType type) => type switch
+    {
+        StockMovementType.ManualAdjustment => Color.Warning,
+        StockMovementType.Sale => Color.Info,
+        StockMovementType.CancellationReturn => Color.Secondary,
+        _ => Color.Default
+    };
+}

@@ -7,12 +7,26 @@ using Microsoft.Extensions.Logging;
 
 namespace CgShop.Application.Catalog;
 
-/// <summary>ABM de productos, variantes e inventario del tenant activo.</summary>
+/// <summary>
+/// ABM de productos, variantes e inventario del tenant activo.
+/// Todo cambio de stock físico deja un <see cref="StockMovement"/> (historial de movimientos) visible para el propietario.
+/// </summary>
 public sealed class ProductAdminService(
     IAppDbContextFactory dbFactory,
     ITenantContext tenant,
+    TimeProvider clock,
     ILogger<ProductAdminService> logger)
 {
+    private DateTime Now => clock.GetUtcNow().UtcDateTime;
+
+    private void RecordInitialStock(IAppDbContext db, Product product, IEnumerable<ProductVariant> variants,
+        ActorInfo actor)
+    {
+        foreach (var v in variants.Where(v => v.StockOnHand > 0))
+            db.StockMovements.Add(new StockMovement(v, product.Name, StockMovementType.InitialStock, v.StockOnHand, 0,
+                actor, Now, "Stock inicial al crear la variante"));
+    }
+
     public async Task<PagedResult<ProductAdminRowDto>> ListAsync(string? search, ProductCategory? category,
         int page = 1, int pageSize = 25, CancellationToken ct = default)
     {
@@ -67,6 +81,7 @@ public sealed class ProductAdminService(
         await EnsureUniqueSlugAsync(db, product, ct);
 
         db.Products.Add(product);
+        RecordInitialStock(db, product, product.Variants, actor);
         await db.SaveChangesAsync(ct);
         logger.LogInformation("Producto {ProductId} creado por {User}", product.Id, actor.UserId);
         return product.Id;
@@ -101,9 +116,16 @@ public sealed class ProductAdminService(
         var variantIds = product.Variants.Select(v => v.Id).ToList();
         var hasSales = await db.OrderItems.AnyAsync(i => variantIds.Contains(i.VariantId), ct);
         if (hasSales)
+        {
             product.Deactivate();
+        }
         else
+        {
+            foreach (var v in product.Variants.Where(v => v.StockOnHand > 0))
+                db.StockMovements.Add(new StockMovement(v, product.Name, StockMovementType.ManualAdjustment,
+                    -v.StockOnHand, v.StockOnHand, actor, Now, "Producto eliminado"));
             db.Products.Remove(product);
+        }
         await db.SaveChangesAsync(ct);
         return !hasSales;
     }
@@ -117,6 +139,7 @@ public sealed class ProductAdminService(
         await EnsureUniqueSkusAsync(db, [dto.Sku.Trim().ToUpperInvariant()], ct);
         var variant = product.AddVariant(dto.Sku, dto.Price, dto.InitialStock, dto.Size, dto.Color, dto.VolumeMl);
         variant.TenantId = product.TenantId;
+        RecordInitialStock(db, product, [variant], actor);
         await db.SaveChangesAsync(ct);
         return variant.Id;
     }
@@ -128,7 +151,11 @@ public sealed class ProductAdminService(
         var product = await LoadAsync(db, productId, ct);
         if (await db.OrderItems.AnyAsync(i => i.VariantId == variantId, ct))
             throw new DomainException("La variante tiene ventas registradas; ajuste su stock a cero en lugar de eliminarla.");
+        var variant = product.Variants.FirstOrDefault(v => v.Id == variantId);
         product.RemoveVariant(variantId);
+        if (variant is { StockOnHand: > 0 })
+            db.StockMovements.Add(new StockMovement(variant, product.Name, StockMovementType.ManualAdjustment,
+                -variant.StockOnHand, variant.StockOnHand, actor, Now, "Variante eliminada"));
         await db.SaveChangesAsync(ct);
     }
 
@@ -154,9 +181,14 @@ public sealed class ProductAdminService(
 
         return await ConcurrencyRetry.ExecuteAsync(dbFactory, async db =>
         {
-            var variant = await db.ProductVariants.FirstOrDefaultAsync(v => v.Id == variantId, ct)
+            var variant = await db.ProductVariants.Include(v => v.Product)
+                              .FirstOrDefaultAsync(v => v.Id == variantId, ct)
                           ?? throw new NotFoundException("Variante no encontrada.");
+            var before = variant.StockOnHand;
             variant.AdjustStock(delta);
+            // Mismo SaveChanges: el ajuste y su registro de auditoría son atómicos.
+            db.StockMovements.Add(new StockMovement(variant, variant.Product!.Name, StockMovementType.ManualAdjustment,
+                delta, before, actor, Now, reason));
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Stock {Sku} ajustado {Delta} por {User}: {Reason}", variant.Sku, delta,
                 actor.UserId, reason);
@@ -185,6 +217,44 @@ public sealed class ProductAdminService(
         return rows.Select(r => new InventoryRowDto(r.Variant.Id, r.Variant.ProductId, r.Name, r.Category,
             r.Variant.Sku, r.Variant.Description, r.Variant.Price, r.Variant.StockOnHand, r.Variant.StockReserved,
             r.Variant.Available)).ToList();
+    }
+
+    /// <summary>
+    /// Historial de movimientos de inventario. Solo el propietario (TenantAdmin) puede consultarlo:
+    /// así ve cualquier ajuste hecho por empleados. Los movimientos son inmutables.
+    /// </summary>
+    public async Task<PagedResult<StockMovementDto>> GetMovementsAsync(StockMovementQuery query, ActorInfo actor,
+        CancellationToken ct = default)
+    {
+        Guard.RequireTenantAdmin(actor);
+        var (page, pageSize) = Guard.Paging(query.Page, query.PageSize);
+        await using var db = dbFactory.CreateDbContext();
+
+        var movements = db.StockMovements.AsNoTracking();
+        if (query.Type is { } type)
+            movements = movements.Where(m => m.Type == type);
+        if (query.VariantId is { } variantId)
+            movements = movements.Where(m => m.VariantId == variantId);
+        if (query.FromUtc is { } from)
+            movements = movements.Where(m => m.CreatedAtUtc >= from);
+        if (query.ToUtc is { } to)
+            movements = movements.Where(m => m.CreatedAtUtc < to);
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = query.Search.Trim();
+            movements = movements.Where(m => m.Sku.Contains(term) || m.ProductName.Contains(term) ||
+                                             m.UserName.Contains(term) ||
+                                             (m.OrderNumber != null && m.OrderNumber.Contains(term)) ||
+                                             (m.Reason != null && m.Reason.Contains(term)));
+        }
+
+        var total = await movements.CountAsync(ct);
+        var items = await movements.OrderByDescending(m => m.CreatedAtUtc).ThenByDescending(m => m.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize)
+            .Select(m => new StockMovementDto(m.Id, m.CreatedAtUtc, m.VariantId, m.Sku, m.ProductName, m.Type,
+                m.Quantity, m.StockBefore, m.StockAfter, m.Reason, m.OrderNumber, m.UserName, m.UserRole))
+            .ToListAsync(ct);
+        return new PagedResult<StockMovementDto>(items, total, page, pageSize);
     }
 
     private static async Task<Product> LoadAsync(IAppDbContext db, Guid productId, CancellationToken ct) =>

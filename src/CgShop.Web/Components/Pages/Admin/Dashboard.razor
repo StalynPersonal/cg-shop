@@ -31,7 +31,21 @@ else
                   Icon="@Icons.Material.Filled.Inventory2" Href="/admin/productos" />
         <StatCard Md="3" Title="Variantes con poco stock" Value="@_dashboard.LowStockVariants.ToString()" Color="Color.Error"
                   Icon="@Icons.Material.Filled.Warning" Href="/admin/inventario" />
+        <AuthorizeView Policy="@Policies.TenantAdmin">
+            <StatCard Md="3" Title="Ajustes manuales (7 días)" Value="@_dashboard.ManualAdjustmentsLast7Days.ToString()"
+                      Color="@(_dashboard.ManualAdjustmentsLast7Days > 0 ? Color.Warning : Color.Default)"
+                      Icon="@Icons.Material.Filled.History" Href="/admin/inventario/movimientos?tipo=ManualAdjustment" />
+        </AuthorizeView>
     </MudGrid>
+    <AuthorizeView Policy="@Policies.TenantAdmin">
+        @if (_dashboard.ManualAdjustmentsLast7Days > 0)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-4" data-testid="manual-adjustments-alert">
+                Se hicieron <b>@_dashboard.ManualAdjustmentsLast7Days</b> ajuste(s) manual(es) de inventario en los últimos 7 días.
+                <MudLink Href="/admin/inventario/movimientos?tipo=ManualAdjustment" Class="ml-2">Ver quién y por qué</MudLink>
+            </MudAlert>
+        }
+    </AuthorizeView>
 
     <MudPaper Class="pa-4" Outlined="true">
         <MudText Typo="Typo.h6" Class="mb-2">Pedidos por estado</MudText>

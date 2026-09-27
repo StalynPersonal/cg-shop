@@ -101,4 +101,5 @@ public sealed record DashboardDto(
     decimal ValidatedRevenue,
     int ActiveProducts,
     int LowStockVariants,
-    IReadOnlyDictionary<OrderStatus, int> ByStatus);
+    IReadOnlyDictionary<OrderStatus, int> ByStatus,
+    int ManualAdjustmentsLast7Days);

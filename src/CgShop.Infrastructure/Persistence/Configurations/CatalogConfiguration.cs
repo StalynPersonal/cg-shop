@@ -45,6 +45,27 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
     }
 }
 
+internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<StockMovement>
+{
+    public void Configure(EntityTypeBuilder<StockMovement> b)
+    {
+        b.ToTable("StockMovements");
+        b.HasKey(m => m.Id);
+        b.Property(m => m.Sku).HasMaxLength(60).IsRequired();
+        b.Property(m => m.ProductName).HasMaxLength(200).IsRequired();
+        b.Property(m => m.Type).HasConversion<string>().HasMaxLength(30);
+        b.Property(m => m.Reason).HasMaxLength(500);
+        b.Property(m => m.OrderNumber).HasMaxLength(30);
+        b.Property(m => m.UserId).HasMaxLength(450).IsRequired();
+        b.Property(m => m.UserName).HasMaxLength(150).IsRequired();
+        b.Property(m => m.UserRole).HasMaxLength(30);
+        b.HasIndex(m => new { m.TenantId, m.CreatedAtUtc });
+        b.HasIndex(m => new { m.TenantId, m.VariantId, m.CreatedAtUtc });
+        b.HasIndex(m => new { m.TenantId, m.Type, m.CreatedAtUtc });
+        // Sin FK a la variante: el historial se conserva aunque la variante se elimine.
+    }
+}
+
 internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<ProductVariant>
 {
     public void Configure(EntityTypeBuilder<ProductVariant> b)

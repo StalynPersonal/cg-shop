@@ -85,6 +85,32 @@ public sealed class OrderFlowTests(SqlServerFixture fx)
     }
 
     [Fact]
+    public async Task Stock_movements_are_persisted_and_isolated_per_store()
+    {
+        var (tenantA, variantsA) = await TenantWithStockAsync(products: 20);
+        var (tenantB, _) = await TenantWithStockAsync(products: 5);
+
+        await using (var scopeA = fx.TenantScope(tenantA))
+        {
+            var products = scopeA.ServiceProvider.GetRequiredService<CgShop.Application.Catalog.ProductAdminService>();
+            for (var i = 0; i < TestData.BatchSize; i++)
+                await products.AdjustStockAsync(variantsA[i % variantsA.Count], i % 2 == 0 ? 1 : -1,
+                    $"Ajuste {i}", TestData.TenantStaff);
+
+            var page = await products.GetMovementsAsync(
+                new CgShop.Application.Catalog.StockMovementQuery(CgShop.Domain.Catalog.StockMovementType.ManualAdjustment,
+                    PageSize: 200), TestData.TenantAdmin);
+            page.TotalCount.Should().Be(TestData.BatchSize);
+        }
+
+        await using var scopeB = fx.TenantScope(tenantB);
+        var dbB = scopeB.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await dbB.StockMovements.CountAsync()).Should().Be(0); // B no ve los movimientos de A
+        (await dbB.StockMovements.IgnoreQueryFilters().CountAsync(m => m.TenantId == tenantA.Id))
+            .Should().Be(TestData.BatchSize);
+    }
+
+    [Fact]
     public async Task Owner_validates_50_and_rejects_50_stock_is_committed_or_released()
     {
         var (tenant, variantIds) = await TenantWithStockAsync(stockPerVariant: 1000);

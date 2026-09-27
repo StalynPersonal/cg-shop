@@ -5,6 +5,7 @@
 <MudText Typo="Typo.h4">Inventario</MudText>
 <MudText Color="Color.Secondary" Class="mb-4">
     <b>Disponible</b> = stock físico − reservado por pedidos pendientes de validación de pago.
+    Cada ajuste queda registrado con usuario, fecha y motivo.
 </MudText>
 
 <MudDataGrid T="InventoryRowDto" Items="_rows" Loading="_rows is null" Dense="true" Hover="true" Elevation="1"
@@ -38,6 +39,13 @@
                                      Margin="Margin.Dense" Style="max-width:90px" />
                     <MudIconButton Icon="@Icons.Material.Filled.Check" Size="Size.Small" Color="Color.Primary"
                                    OnClick="() => Adjust(context.Item)" aria-label="Aplicar ajuste" />
+                    <AuthorizeView Policy="@Policies.TenantAdmin" Context="auth">
+                        <MudTooltip Text="Ver historial de movimientos">
+                            <MudIconButton Icon="@Icons.Material.Filled.History" Size="Size.Small"
+                                           Href="@($"/admin/inventario/movimientos?variante={context.Item.VariantId}")"
+                                           aria-label="Historial" />
+                        </MudTooltip>
+                    </AuthorizeView>
                 </MudStack>
             </CellTemplate>
         </TemplateColumn>

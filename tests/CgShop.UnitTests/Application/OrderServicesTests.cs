@@ -210,6 +210,38 @@ public class OrderServicesTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Validating_100_payments_records_sales_and_cancelling_records_returns()
+    {
+        var checkout = Checkout();
+        var admin = Admin();
+        var results = new List<PlaceOrderResult>();
+        for (var i = 0; i < TestData.BatchSize; i++)
+            results.Add(await checkout.PlaceOrderAsync(Request(i, qty: 2)));
+
+        foreach (var r in results)
+            await admin.ValidatePaymentAsync(r.OrderId, TestData.TenantAdmin, null);
+        for (var i = 0; i < 10; i++)
+            await admin.CancelAsync(results[i].OrderId, TestData.TenantAdmin, "Cliente desistió");
+
+        await using var ctx = _factory.CreateAppDbContext();
+        var sales = await ctx.StockMovements.Where(m => m.Type == StockMovementType.Sale).ToListAsync();
+        sales.Should().HaveCount(TestData.BatchSize);
+        sales.Should().AllSatisfy(m =>
+        {
+            m.Quantity.Should().Be(-2);
+            m.OrderNumber.Should().NotBeNullOrEmpty();
+            m.UserName.Should().Be(TestData.TenantAdmin.DisplayName);
+        });
+        sales.Select(m => m.OrderNumber).Should().BeEquivalentTo(results.Select(r => r.Number));
+
+        var returns = await ctx.StockMovements.Where(m => m.Type == StockMovementType.CancellationReturn).ToListAsync();
+        returns.Should().HaveCount(10).And.OnlyContain(m => m.Quantity == 2 && m.Reason == "Cliente desistió");
+
+        var dashboard = await admin.GetDashboardAsync();
+        dashboard.ManualAdjustmentsLast7Days.Should().Be(0);
+    }
+
+    [Fact]
     public async Task Dashboard_counts_statuses_and_revenue()
     {
         var checkout = Checkout();

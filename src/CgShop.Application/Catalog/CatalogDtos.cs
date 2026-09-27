@@ -97,6 +97,30 @@ public sealed class VariantUpsertDto
     public int InitialStock { get; set; }
 }
 
+public sealed record StockMovementQuery(
+    StockMovementType? Type = null,
+    Guid? VariantId = null,
+    string? Search = null,
+    DateTime? FromUtc = null,
+    DateTime? ToUtc = null,
+    int Page = 1,
+    int PageSize = 50);
+
+public sealed record StockMovementDto(
+    Guid Id,
+    DateTime CreatedAtUtc,
+    Guid VariantId,
+    string Sku,
+    string ProductName,
+    StockMovementType Type,
+    int Quantity,
+    int StockBefore,
+    int StockAfter,
+    string? Reason,
+    string? OrderNumber,
+    string UserName,
+    string? UserRole);
+
 public sealed record InventoryRowDto(
     Guid VariantId,
     Guid ProductId,

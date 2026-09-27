@@ -81,7 +81,7 @@ public class CatalogServiceTests : IAsyncLifetime
         nike.Items.Should().OnlyContain(p => p.Brand == "Nike");
         nike.TotalCount.Should().Be(10);
 
-        var admin = new ProductAdminService(_factory, _factory.Context, NullLogger<ProductAdminService>.Instance);
+        var admin = new ProductAdminService(_factory, _factory.Context, TimeProvider.System, NullLogger<ProductAdminService>.Instance);
         foreach (var p in nike.Items)
             await admin.SetActiveAsync(p.Id, false, TestData.TenantStaff);
 
@@ -123,7 +123,7 @@ public class ProductAdminServiceTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _factory = _db.For(await _db.AddTenantAsync());
-        _service = new ProductAdminService(_factory, _factory.Context, NullLogger<ProductAdminService>.Instance);
+        _service = new ProductAdminService(_factory, _factory.Context, TimeProvider.System, NullLogger<ProductAdminService>.Instance);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
@@ -212,6 +212,61 @@ public class ProductAdminServiceTests : IAsyncLifetime
 
         var low = await _service.GetInventoryAsync(maxAvailable: 0);
         low.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Every_manual_adjustment_by_staff_is_recorded_and_visible_only_to_owner()
+    {
+        for (var i = 1; i <= 50; i++)
+        {
+            var (p, v) = Dto(i);
+            await _service.CreateAsync(p, v, TestData.TenantAdmin);
+        }
+
+        var variants = (await _service.GetInventoryAsync()).Take(TestData.BatchSize).ToList();
+        variants.Should().HaveCount(TestData.BatchSize);
+        foreach (var (row, i) in variants.Select((r, i) => (r, i)))
+        {
+            var delta = i % 2 == 0 ? 5 : -3;
+            await _service.AdjustStockAsync(row.VariantId, delta, $"Conteo físico {i}", TestData.TenantStaff);
+        }
+
+        var manual = await _service.GetMovementsAsync(
+            new StockMovementQuery(StockMovementType.ManualAdjustment, PageSize: 200), TestData.TenantAdmin);
+        manual.TotalCount.Should().Be(TestData.BatchSize);
+        manual.Items.Should().AllSatisfy(m =>
+        {
+            m.UserName.Should().Be(TestData.TenantStaff.DisplayName);
+            m.UserRole.Should().Be(Roles.TenantStaff);
+            m.Reason.Should().StartWith("Conteo físico");
+            m.StockAfter.Should().Be(m.StockBefore + m.Quantity);
+        });
+
+        var byVariant = await _service.GetMovementsAsync(
+            new StockMovementQuery(VariantId: variants[0].VariantId), TestData.TenantAdmin);
+        byVariant.Items.Select(m => m.Type).Should().BeEquivalentTo([StockMovementType.ManualAdjustment, StockMovementType.InitialStock]);
+
+        await _service.Invoking(s => s.GetMovementsAsync(new StockMovementQuery(), TestData.TenantStaff))
+            .Should().ThrowAsync<ForbiddenException>();
+    }
+
+    [Fact]
+    public async Task Creating_products_records_initial_stock_and_deleting_records_the_exit()
+    {
+        var ids = new List<Guid>();
+        for (var i = 1; i <= TestData.BatchSize; i++)
+        {
+            var (p, v) = Dto(i);
+            ids.Add(await _service.CreateAsync(p, v, TestData.TenantStaff));
+        }
+
+        var initial = await _service.GetMovementsAsync(
+            new StockMovementQuery(StockMovementType.InitialStock, PageSize: 500), TestData.TenantAdmin);
+        initial.TotalCount.Should().Be(TestData.Products().Sum(p => p.Variants.Count));
+
+        (await _service.DeleteAsync(ids[0], TestData.TenantAdmin)).Should().BeTrue();
+        var exits = await _service.GetMovementsAsync(new StockMovementQuery(Search: "Producto eliminado"), TestData.TenantAdmin);
+        exits.Items.Should().NotBeEmpty().And.OnlyContain(m => m.Quantity < 0 && m.StockAfter == 0);
     }
 
     [Fact]

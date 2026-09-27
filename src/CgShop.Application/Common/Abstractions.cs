@@ -25,6 +25,7 @@ public interface IAppDbContext : IAsyncDisposable, IDisposable
     DbSet<OrderStatusHistory> OrderStatusHistory { get; }
     DbSet<PaymentReceipt> PaymentReceipts { get; }
     DbSet<StockReservation> StockReservations { get; }
+    DbSet<StockMovement> StockMovements { get; }
     DatabaseFacade Database { get; }
     Microsoft.EntityFrameworkCore.ChangeTracking.ChangeTracker ChangeTracker { get; }
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

@@ -1,5 +1,6 @@
 using CgShop.Application.Common;
 using CgShop.Application.Tenancy;
+using CgShop.Domain.Catalog;
 using CgShop.Domain.Common;
 using CgShop.Domain.Orders;
 using Microsoft.EntityFrameworkCore;
@@ -57,7 +58,7 @@ public sealed class OrderAdminService(
         return MutateAsync(orderId, async (db, order, now) =>
         {
             order.ValidatePayment(actor, note, now);
-            await SettleReservationsAsync(db, order.Id, commit: true, ct);
+            await SettleReservationsAsync(db, order, commit: true, actor, now, ct);
         }, ct);
     }
 
@@ -68,7 +69,7 @@ public sealed class OrderAdminService(
         return MutateAsync(orderId, async (db, order, now) =>
         {
             order.RejectPayment(actor, reason, now);
-            await SettleReservationsAsync(db, order.Id, commit: false, ct);
+            await SettleReservationsAsync(db, order, commit: false, actor, now, ct);
         }, ct);
     }
 
@@ -101,14 +102,20 @@ public sealed class OrderAdminService(
             order.Cancel(actor, reason, now);
             if (wasPending)
             {
-                await SettleReservationsAsync(db, order.Id, commit: false, ct);
+                await SettleReservationsAsync(db, order, commit: false, actor, now, ct);
             }
             else
             {
                 var qtyByVariant = order.Items.GroupBy(i => i.VariantId).ToDictionary(g => g.Key, g => g.Sum(i => i.Quantity));
                 var ids = qtyByVariant.Keys.ToList();
                 foreach (var variant in await db.ProductVariants.Where(v => ids.Contains(v.Id)).ToListAsync(ct))
+                {
+                    var before = variant.StockOnHand;
                     variant.AdjustStock(qtyByVariant[variant.Id]);
+                    db.StockMovements.Add(new StockMovement(variant, ProductNameOf(order, variant.Id),
+                        StockMovementType.CancellationReturn, qtyByVariant[variant.Id], before, actor, now, reason,
+                        order.Number));
+                }
             }
         }, ct);
 
@@ -139,10 +146,14 @@ public sealed class OrderAdminService(
         var lowStock = await db.ProductVariants.AsNoTracking()
             .CountAsync(v => v.Product!.IsActive && v.StockOnHand - v.StockReserved <= lowStockThreshold, ct);
 
+        var weekAgo = clock.GetUtcNow().UtcDateTime.AddDays(-7);
+        var manualAdjustments = await db.StockMovements.AsNoTracking()
+            .CountAsync(m => m.Type == StockMovementType.ManualAdjustment && m.CreatedAtUtc >= weekAgo, ct);
+
         int Count(OrderStatus s) => byStatus.GetValueOrDefault(s);
         return new DashboardDto(Count(OrderStatus.PendingPaymentValidation),
             Count(OrderStatus.PaymentValidated) + Count(OrderStatus.Preparing), Count(OrderStatus.Shipped),
-            ordersToday, revenue, activeProducts, lowStock, byStatus);
+            ordersToday, revenue, activeProducts, lowStock, byStatus, manualAdjustments);
     }
 
     private async Task MutateAsync(Guid orderId, Func<IAppDbContext, Order, DateTime, Task> action,
@@ -161,11 +172,12 @@ public sealed class OrderAdminService(
     }
 
     /// <summary>Confirma (pago validado) o libera (rechazo/cancelación/expiración) las reservas activas.</summary>
-    internal static async Task SettleReservationsAsync(IAppDbContext db, Guid orderId, bool commit,
-        CancellationToken ct)
+    /// <remarks>Al confirmar, cada salida de stock queda registrada como movimiento de tipo Venta.</remarks>
+    internal static async Task SettleReservationsAsync(IAppDbContext db, Order order, bool commit, ActorInfo actor,
+        DateTime now, CancellationToken ct)
     {
         var reservations = await db.StockReservations
-            .Where(r => r.OrderId == orderId && r.Status == ReservationStatus.Active).ToListAsync(ct);
+            .Where(r => r.OrderId == order.Id && r.Status == ReservationStatus.Active).ToListAsync(ct);
         var ids = reservations.Select(r => r.VariantId).Distinct().ToList();
         var variants = await db.ProductVariants.Where(v => ids.Contains(v.Id)).ToDictionaryAsync(v => v.Id, ct);
 
@@ -174,8 +186,12 @@ public sealed class OrderAdminService(
             var variant = variants[reservation.VariantId];
             if (commit)
             {
+                var before = variant.StockOnHand;
                 variant.CommitReservation(reservation.Quantity);
                 reservation.Commit();
+                db.StockMovements.Add(new StockMovement(variant, ProductNameOf(order, variant.Id),
+                    StockMovementType.Sale, -reservation.Quantity, before, actor, now,
+                    "Pago validado", order.Number));
             }
             else
             {
@@ -184,6 +200,9 @@ public sealed class OrderAdminService(
             }
         }
     }
+
+    private static string ProductNameOf(Order order, Guid variantId) =>
+        order.Items.FirstOrDefault(i => i.VariantId == variantId)?.ProductName ?? "";
 
     private static async Task<Order> LoadAsync(IAppDbContext db, Guid orderId, bool tracking, CancellationToken ct)
     {
