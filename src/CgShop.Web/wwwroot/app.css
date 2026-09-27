@@ -395,3 +395,28 @@ html, body {
 @media (max-width: 599.98px) {
     .cg-header-cart { margin-left: 4px; }
 }
+
+/* Botón flotante de WhatsApp (activable por el propietario). */
+.cg-whatsapp-float {
+    position: fixed;
+    right: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    z-index: 1300;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: #25D366;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .3);
+    transition: transform .15s, box-shadow .15s;
+}
+
+.cg-whatsapp-float:hover { transform: scale(1.08); box-shadow: 0 6px 16px rgba(0, 0, 0, .35); }
+.cg-whatsapp-float .mud-icon-root { font-size: 34px; }
+
+@media (max-width: 600px) {
+    .cg-whatsapp-float { right: 16px; bottom: calc(16px + env(safe-area-inset-bottom, 0px)); width: 54px; height: 54px; }
+}

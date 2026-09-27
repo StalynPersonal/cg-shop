@@ -53,6 +53,12 @@ else
                               Placeholder="+1 809 555 1234" Variant="Variant.Outlined" MaxLength="30"
                               Adornment="Adornment.Start" AdornmentIcon="@Icons.Custom.Brands.WhatsApp"
                               HelperText="Se muestra al cliente para que confirme su pago o envíe el comprobante." />
+                <MudSwitch T="bool" @bind-Value="_settings.ShowWhatsAppButton" Color="Color.Success" Class="mt-2"
+                           Disabled="@string.IsNullOrWhiteSpace(_settings.WhatsAppNumber)" data-testid="whatsapp-float-switch"
+                           Label="Mostrar botón flotante de WhatsApp en toda la tienda" />
+                <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                    Un círculo verde en la esquina inferior para que los clientes le escriban desde cualquier página.
+                </MudText>
 
                 <MudText Typo="Typo.h6" Class="mt-6 mb-2">Retiro en tienda</MudText>
                 <MudTextField @bind-Value="_settings.PickupAddress" Label="Dirección de retiro (se muestra a quien elige retirar)"

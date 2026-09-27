@@ -176,6 +176,7 @@
         </MudPaper>
     </MudMainContent>
 </MudLayout>
+<WhatsAppFloatingButton StoreName="@Host.Tenant?.Name" />
 
 @code {
     [CascadingParameter] private HostContext Host { get; set; } = default!;

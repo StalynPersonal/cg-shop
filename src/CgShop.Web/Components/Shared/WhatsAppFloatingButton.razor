@@ -1,0 +1,21 @@
+@* Botón flotante de WhatsApp en toda la tienda. Solo aparece si el propietario lo activó en "Datos de pago". *@
+@inject TenantSettingsService Settings
+
+@if (Link is not null)
+{
+    <a href="@Link" target="_blank" rel="noopener noreferrer" class="cg-whatsapp-float"
+       aria-label="Escríbenos por WhatsApp" title="Escríbenos por WhatsApp" data-testid="whatsapp-float">
+        <MudIcon Icon="@Icons.Custom.Brands.WhatsApp" />
+    </a>
+}
+
+@code {
+    [Parameter] public string? StoreName { get; set; }
+
+    private string? _number;
+
+    private string? Link => WhatsApp.ChatLink(_number,
+        $"Hola{(StoreName is null ? "" : " " + StoreName)}, tengo una consulta sobre sus productos.");
+
+    protected override async Task OnInitializedAsync() => _number = await Settings.GetFloatingWhatsAppAsync();
+}

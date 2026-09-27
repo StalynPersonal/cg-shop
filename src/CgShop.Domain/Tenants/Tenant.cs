@@ -95,6 +95,8 @@ public sealed partial class Tenant : Entity
 
         if (!string.IsNullOrWhiteSpace(settings.WhatsAppNumber) && !WhatsApp.IsValid(settings.WhatsAppNumber))
             throw new DomainException("El número de WhatsApp no es válido (use código de país, ej. +1 809 555 1234).");
+        if (settings.ShowWhatsAppButton && string.IsNullOrWhiteSpace(settings.WhatsAppNumber))
+            throw new DomainException("Para mostrar el botón flotante de WhatsApp indique el número.");
 
         foreach (var account in settings.BankAccounts)
         {
@@ -118,7 +120,8 @@ public sealed partial class Tenant : Entity
             PaymentLinkUrl = string.IsNullOrWhiteSpace(settings.PaymentLinkUrl) ? null : settings.PaymentLinkUrl.Trim(),
             Instructions = string.IsNullOrWhiteSpace(settings.Instructions) ? null : settings.Instructions.Trim(),
             PickupAddress = string.IsNullOrWhiteSpace(settings.PickupAddress) ? null : settings.PickupAddress.Trim(),
-            WhatsAppNumber = string.IsNullOrWhiteSpace(settings.WhatsAppNumber) ? null : settings.WhatsAppNumber.Trim()
+            WhatsAppNumber = string.IsNullOrWhiteSpace(settings.WhatsAppNumber) ? null : settings.WhatsAppNumber.Trim(),
+            ShowWhatsAppButton = settings.ShowWhatsAppButton
         };
     }
 

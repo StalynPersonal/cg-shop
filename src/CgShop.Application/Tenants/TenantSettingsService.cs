@@ -20,6 +20,7 @@ public sealed class TenantSettingsService(IAppDbContextFactory dbFactory, ITenan
             Instructions = tenant.PaymentSettings.Instructions,
             PickupAddress = tenant.PaymentSettings.PickupAddress,
             WhatsAppNumber = tenant.PaymentSettings.WhatsAppNumber,
+            ShowWhatsAppButton = tenant.PaymentSettings.ShowWhatsAppButton,
             BankAccounts = tenant.PaymentSettings.BankAccounts.Select(b => new BankAccount
             {
                 BankName = b.BankName, AccountNumber = b.AccountNumber, AccountHolder = b.AccountHolder,
@@ -37,5 +38,16 @@ public sealed class TenantSettingsService(IAppDbContextFactory dbFactory, ITenan
         var tenant = await db.Tenants.FirstAsync(t => t.Id == info.Id, ct);
         tenant.UpdatePaymentSettings(settings);
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Número para el botón flotante de WhatsApp de la tienda, o null si el propietario no lo activó.</summary>
+    public async Task<string?> GetFloatingWhatsAppAsync(CancellationToken ct = default)
+    {
+        if (tenantContext.Tenant is not { } info)
+            return null;
+        await using var db = dbFactory.CreateDbContext();
+        var settings = await db.Tenants.AsNoTracking().Where(t => t.Id == info.Id)
+            .Select(t => t.PaymentSettings).FirstOrDefaultAsync(ct);
+        return settings is { ShowWhatsAppButton: true, WhatsAppNumber: { Length: > 0 } number } ? number : null;
     }
 }
