@@ -50,6 +50,18 @@
                             <MudText Typo="Typo.caption" Class="d-block">
                                 @image.Width×@image.Height px · @Ui.FileSize(image.SizeBytes)
                             </MudText>
+                            @if (Colors.Count > 0)
+                            {
+                                <MudSelect T="string" Value="@(image.Color ?? string.Empty)" ValueChanged="c => SetColorAsync(image, c)"
+                                           Label="Color" Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined" Class="mt-2"
+                                           data-testid="photo-color">
+                                    <MudSelectItem T="string" Value="@string.Empty">Todos los colores</MudSelectItem>
+                                    @foreach (var c in Colors)
+                                    {
+                                        <MudSelectItem T="string" Value="@c">@c</MudSelectItem>
+                                    }
+                                </MudSelect>
+                            }
                         </MudCardContent>
                         <MudCardActions Class="pa-1 justify-space-between">
                             <MudIconButton Icon="@Icons.Material.Filled.ChevronLeft" Size="Size.Small" Disabled="@(index == 0)"
@@ -77,6 +89,11 @@
 @code {
     [Parameter, EditorRequired] public Guid ProductId { get; set; }
 
+    /// <summary>Colores de las variantes, para asociar cada foto a uno.</summary>
+    [Parameter] public IReadOnlyList<string> Colors { get; set; } = [];
+
+    private Guid _loadedFor;
+
     private IReadOnlyList<ProductImageDto> _images = [];
     private bool _uploading;
 
@@ -84,7 +101,13 @@
     private int Remaining => Math.Max(0, Opts.MaxImagesPerProduct - _images.Count);
     private string MaxMb => (Opts.MaxImageBytes / 1024d / 1024d).ToString("0.#");
 
-    protected override async Task OnParametersSetAsync() => await LoadAsync();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedFor == ProductId)
+            return;
+        _loadedFor = ProductId;
+        await LoadAsync();
+    }
 
     private async Task LoadAsync() => _images = await Images.ListAsync(ProductId);
 
@@ -124,6 +147,14 @@
     private async Task SetMainAsync(ProductImageDto image)
     {
         if (await Snackbar.TryAsync(() => Images.SetMainAsync(ProductId, image.Id, Actor), "Foto principal actualizada."))
+            await LoadAsync();
+    }
+
+    private async Task SetColorAsync(ProductImageDto image, string? color)
+    {
+        var value = string.IsNullOrEmpty(color) ? null : color;
+        if (await Snackbar.TryAsync(() => Images.SetColorAsync(ProductId, image.Id, value, Actor),
+                value is null ? "La foto se muestra en todos los colores." : $"La foto se mostrará al elegir {value}."))
             await LoadAsync();
     }
 

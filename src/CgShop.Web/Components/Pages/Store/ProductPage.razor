@@ -19,7 +19,7 @@ else
     <MudGrid Spacing="6">
         <MudItem xs="12" md="6">
             <ProductGallery Images="_product.Images" FallbackUrl="@_product.ImageUrl" Category="_product.Category"
-                            AltText="@_product.Name" />
+                            AltText="@_product.Name" Color="@_color" />
         </MudItem>
         <MudItem xs="12" md="6">
             <MudStack Spacing="3">
@@ -36,7 +36,7 @@ else
                 @if (_sizes.Count > 0)
                 {
                     <div>
-                        <MudText Typo="Typo.subtitle2">Talla</MudText>
+                        <MudText Typo="Typo.subtitle2">Talla: <b data-testid="selected-size">@_size</b></MudText>
                         <MudChipSet T="string" SelectedValue="_size" SelectedValueChanged="SelectSize" SelectionMode="SelectionMode.SingleSelection"
                                     CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
                             @foreach (var s in _sizes)
@@ -49,7 +49,7 @@ else
                 @if (_colors.Count > 0)
                 {
                     <div>
-                        <MudText Typo="Typo.subtitle2">Color</MudText>
+                        <MudText Typo="Typo.subtitle2">Color: <b data-testid="selected-color">@_color</b></MudText>
                         <MudChipSet T="string" SelectedValue="_color" SelectedValueChanged="SelectColor" SelectionMode="SelectionMode.SingleSelection"
                                     CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
                             @foreach (var c in _colors)

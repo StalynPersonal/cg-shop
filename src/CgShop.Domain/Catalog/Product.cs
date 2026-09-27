@@ -69,6 +69,24 @@ public sealed class Product : Entity, ITenantEntity
         Renumber(ordered);
     }
 
+    /// <summary>
+    /// Asocia la foto a un color de las variantes (la tienda la muestra al elegir ese color).
+    /// null o vacío = la foto aplica a todos los colores.
+    /// </summary>
+    public void SetImageColor(Guid imageId, string? color)
+    {
+        var image = FindImage(imageId);
+        if (string.IsNullOrWhiteSpace(color))
+        {
+            image.Color = null;
+            return;
+        }
+
+        var match = _variants.Select(v => v.Color).FirstOrDefault(c =>
+            c is not null && string.Equals(c, color.Trim(), StringComparison.OrdinalIgnoreCase));
+        image.Color = match ?? throw new DomainException($"El producto no tiene variantes de color '{color.Trim()}'.");
+    }
+
     private ProductImage FindImage(Guid imageId) =>
         _images.FirstOrDefault(i => i.Id == imageId) ?? throw new DomainException("Foto no encontrada.");
 

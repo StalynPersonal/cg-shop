@@ -1,14 +1,14 @@
 @* Galería de la tienda: foto grande + miniaturas. Sin fotos, muestra la URL externa o el ícono de la categoría. *@
 <div data-testid="product-gallery">
-    @if (Images.Count > 0)
+    @if (Visible.Count > 0)
     {
         <div class="cg-gallery-main rounded-lg">
             <img src="@Selected.Url" alt="@AltText" data-testid="gallery-main" />
         </div>
-        @if (Images.Count > 1)
+        @if (Visible.Count > 1)
         {
             <MudStack Row="true" Spacing="2" Wrap="Wrap.Wrap" Class="mt-2">
-                @foreach (var image in Images)
+                @foreach (var image in Visible)
                 {
                     <button type="button" class="@($"cg-gallery-thumb {(image.Id == Selected.Id ? "selected" : "")}")"
                             @onclick="() => _selectedId = image.Id" aria-label="Ver foto" data-testid="gallery-thumb">
@@ -36,13 +36,33 @@
     [Parameter] public ProductCategory Category { get; set; }
     [Parameter] public string AltText { get; set; } = "";
 
-    private Guid? _selectedId;
+    /// <summary>Color elegido en la tienda: se muestran sus fotos primero, más las generales.</summary>
+    [Parameter] public string? Color { get; set; }
 
-    private ProductImageDto Selected => Images.FirstOrDefault(i => i.Id == _selectedId) ?? Images[0];
+    private Guid? _selectedId;
+    private string? _shownColor;
+    private IReadOnlyList<ProductImageDto> Visible { get; set; } = [];
+
+    private ProductImageDto Selected => Visible.FirstOrDefault(i => i.Id == _selectedId) ?? Visible[0];
 
     protected override void OnParametersSet()
     {
-        if (_selectedId is { } id && Images.All(i => i.Id != id))
+        Visible = ForColor(Images, Color);
+        // Al cambiar de color se vuelve a la primera foto (la del color).
+        if (_shownColor != Color || (_selectedId is { } id && Visible.All(i => i.Id != id)))
             _selectedId = null;
+        _shownColor = Color;
+    }
+
+    /// <summary>
+    /// Fotos del color + fotos sin color. Si no hay ninguna de esas (todas son de otros colores), se muestran todas.
+    /// </summary>
+    public static IReadOnlyList<ProductImageDto> ForColor(IReadOnlyList<ProductImageDto> images, string? color)
+    {
+        var ofColor = color is null
+            ? []
+            : images.Where(i => string.Equals(i.Color, color, StringComparison.OrdinalIgnoreCase)).ToList();
+        var result = ofColor.Concat(images.Where(i => i.Color is null)).ToList();
+        return result.Count > 0 ? result : images;
     }
 }

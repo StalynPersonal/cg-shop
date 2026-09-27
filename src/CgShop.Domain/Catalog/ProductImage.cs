@@ -30,5 +30,8 @@ public sealed class ProductImage : Entity, ITenantEntity
     public int Height { get; private set; }
     public string OriginalFileName { get; private set; } = "";
     public int SortOrder { get; internal set; }
+
+    /// <summary>Color de la variante que muestra la foto; null = aplica a todos los colores.</summary>
+    public string? Color { get; internal set; }
     public DateTime UploadedAtUtc { get; private set; }
 }

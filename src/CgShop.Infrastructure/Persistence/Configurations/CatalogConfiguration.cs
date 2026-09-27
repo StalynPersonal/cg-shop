@@ -58,6 +58,7 @@ internal sealed class ProductImageConfiguration : IEntityTypeConfiguration<Produ
         b.Property(i => i.StoragePath).HasMaxLength(500).IsRequired();
         b.Property(i => i.ContentType).HasMaxLength(50).IsRequired();
         b.Property(i => i.OriginalFileName).HasMaxLength(260).IsRequired();
+        b.Property(i => i.Color).HasMaxLength(50);
         b.HasIndex(i => new { i.ProductId, i.SortOrder });
     }
 }

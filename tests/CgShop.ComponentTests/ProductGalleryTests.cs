@@ -28,6 +28,51 @@ public sealed class ProductGalleryTests : MudTestContext
     }
 
     [Fact]
+    public void Choosing_a_color_shows_its_photos_first_for_100_photos()
+    {
+        string[] colors = ["Negro", "Blanco", "Rojo", "Azul"];
+        // 100 fotos: cada 5ª es general, el resto repartidas entre 4 colores.
+        var images = Enumerable.Range(0, TestData.BatchSize).Select(i =>
+            new ProductImageDto(Guid.NewGuid(), $"/imagenes/{i}", i, 800, 600, 1000, $"f{i}.jpg",
+                i % 5 == 0 ? null : colors[i % colors.Length])).ToList();
+
+        var cut = Render<ProductGallery>(p => p.Add(x => x.Images, images).Add(x => x.Color, "Negro"));
+
+        foreach (var color in colors)
+        {
+            cut.Render(p => p.Add(x => x.Images, images).Add(x => x.Color, color));
+            var shown = ProductGallery.ForColor(images, color);
+            shown.Should().OnlyContain(i => i.Color == color || i.Color == null);
+            shown.Should().HaveCount(images.Count(i => i.Color == color || i.Color == null));
+            shown[0].Color.Should().Be(color, "las fotos del color van primero");
+
+            cut.Find("[data-testid='gallery-main']").GetAttribute("src").Should().Be(shown[0].Url);
+            cut.FindAll("[data-testid='gallery-thumb']").Should().HaveCount(shown.Count);
+        }
+
+        // Si se había elegido otra miniatura, al cambiar de color vuelve a la primera foto del color nuevo.
+        cut.FindAll("[data-testid='gallery-thumb']")[5].Click();
+        cut.Render(p => p.Add(x => x.Images, images).Add(x => x.Color, "Blanco"));
+        cut.Find("[data-testid='gallery-main']").GetAttribute("src")
+            .Should().Be(ProductGallery.ForColor(images, "Blanco")[0].Url);
+    }
+
+    [Fact]
+    public void Color_without_own_photos_shows_general_ones_and_all_when_none_are_general()
+    {
+        var images = new List<ProductImageDto>
+        {
+            new(Guid.NewGuid(), "/imagenes/a", 0, 800, 600, 1, "a.jpg", "Negro"),
+            new(Guid.NewGuid(), "/imagenes/b", 1, 800, 600, 1, "b.jpg"),
+        };
+        ProductGallery.ForColor(images, "Verde").Select(i => i.Url).Should().Equal("/imagenes/b");
+        ProductGallery.ForColor(images, null).Select(i => i.Url).Should().Equal("/imagenes/b");
+
+        var onlyColored = images.Take(1).ToList();
+        ProductGallery.ForColor(onlyColored, "Verde").Should().HaveCount(1);
+    }
+
+    [Fact]
     public void Single_photo_has_no_thumbnails_and_no_photos_shows_fallback()
     {
         Render<ProductGallery>(p => p.Add(x => x.Images, Images(1)))

@@ -122,7 +122,7 @@ else
     }
     else
     {
-        <ProductGalleryEditor ProductId="Id!.Value" />
+        <ProductGalleryEditor ProductId="Id!.Value" Colors="@(_variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList())" />
     }
 }
 

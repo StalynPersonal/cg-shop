@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 namespace CgShop.Application.Catalog;
 
 public sealed record ProductImageDto(Guid Id, string Url, int SortOrder, int Width, int Height, long SizeBytes,
-    string FileName)
+    string FileName, string? Color = null)
 {
     public bool IsMain => SortOrder == 0;
 }
@@ -83,6 +83,10 @@ public sealed class ProductImageService(
     public Task MoveAsync(Guid productId, Guid imageId, int offset, ActorInfo actor, CancellationToken ct = default) =>
         MutateAsync(productId, actor, p => p.MoveImage(imageId, offset), ct);
 
+    /// <summary>Asocia la foto a un color de variante (null = todos los colores).</summary>
+    public Task SetColorAsync(Guid productId, Guid imageId, string? color, ActorInfo actor, CancellationToken ct = default) =>
+        MutateAsync(productId, actor, p => p.SetImageColor(imageId, color), ct, includeVariants: true);
+
     public async Task DeleteAsync(Guid productId, Guid imageId, ActorInfo actor, CancellationToken ct = default)
     {
         Guard.RequireStaff(actor);
@@ -109,11 +113,14 @@ public sealed class ProductImageService(
     }
 
     private async Task MutateAsync(Guid productId, ActorInfo actor, Action<Domain.Catalog.Product> action,
-        CancellationToken ct)
+        CancellationToken ct, bool includeVariants = false)
     {
         Guard.RequireStaff(actor);
         await using var db = dbFactory.CreateDbContext();
-        var product = await db.Products.Include(p => p.Images).FirstOrDefaultAsync(p => p.Id == productId, ct)
+        var query = db.Products.Include(p => p.Images).AsQueryable();
+        if (includeVariants)
+            query = query.Include(p => p.Variants);
+        var product = await query.FirstOrDefaultAsync(p => p.Id == productId, ct)
                       ?? throw new NotFoundException("Producto no encontrado.");
         action(product);
         await db.SaveChangesAsync(ct);
@@ -135,5 +142,5 @@ public sealed class ProductImageService(
     }
 
     internal static ProductImageDto ToDto(Domain.Catalog.ProductImage i) =>
-        new(i.Id, UrlFor(i.Id), i.SortOrder, i.Width, i.Height, i.SizeBytes, i.OriginalFileName);
+        new(i.Id, UrlFor(i.Id), i.SortOrder, i.Width, i.Height, i.SizeBytes, i.OriginalFileName, i.Color);
 }

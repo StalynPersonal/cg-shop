@@ -138,6 +138,40 @@ public class ProductImageServiceTests : IAsyncLifetime, IDisposable
     }
 
     [Fact]
+    public async Task Assigns_100_photos_to_variant_colors_and_catalog_exposes_them()
+    {
+        var expected = new Dictionary<Guid, string?>();
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            var product = _products[i % 10];
+            var colors = product.Variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList();
+            var image = await Upload(product.Id, i);
+            // Una de cada tres queda general; el resto, a un color (en minúsculas: se normaliza al de la variante).
+            var color = colors.Count == 0 || i % 3 == 0 ? null : colors[i % colors.Count];
+            await _service.SetColorAsync(product.Id, image.Id, color?.ToLowerInvariant(), TestData.TenantStaff);
+            expected[image.Id] = color;
+        }
+
+        var catalog = new CatalogService(_factory);
+        foreach (var product in _products)
+        {
+            var detail = await catalog.GetBySlugAsync(product.Slug);
+            detail!.Images.Should().HaveCount(10);
+            detail.Images.Should().OnlyContain(im => im.Color == expected[im.Id]);
+        }
+
+        var target = _products.First(p => p.Variants.Any(v => v.Color != null));
+        var photo = (await _service.ListAsync(target.Id))[0];
+        await _service.Invoking(s => s.SetColorAsync(target.Id, photo.Id, "Morado fosforescente", TestData.TenantStaff))
+            .Should().ThrowAsync<DomainException>().WithMessage("*no tiene variantes de color*");
+        await _service.Invoking(s => s.SetColorAsync(target.Id, photo.Id, null, TestData.Customer))
+            .Should().ThrowAsync<ForbiddenException>();
+
+        await _service.SetColorAsync(target.Id, photo.Id, "  ", TestData.TenantStaff);
+        (await _service.ListAsync(target.Id))[0].Color.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Enforces_max_photos_per_product_and_rejects_invalid_uploads()
     {
         var productId = _products[0].Id;

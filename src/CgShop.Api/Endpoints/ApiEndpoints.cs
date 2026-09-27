@@ -17,6 +17,7 @@ public sealed record LoginRequest(string Email, string Password);
 public sealed record TokenResponse(string AccessToken, DateTime ExpiresAtUtc, string TokenType = "Bearer");
 public sealed record NoteRequest(string? Note);
 public sealed record StockAdjustRequest(int Delta, string Reason);
+public sealed record ImageColorRequest(string? Color);
 public sealed record CreateProductRequest(ProductUpsertDto Product, List<VariantUpsertDto> Variants);
 
 public static class AuthEndpoints
@@ -225,6 +226,13 @@ public static class AdminEndpoints
             ProductImageService images, HttpContext http, CancellationToken ct) =>
         {
             await images.SetMainAsync(id, imageId, http.User.ToActor(), ct);
+            return Results.NoContent();
+        });
+
+        admin.MapPut("/products/{id:guid}/images/{imageId:guid}/color", async (Guid id, Guid imageId,
+            ImageColorRequest body, ProductImageService images, HttpContext http, CancellationToken ct) =>
+        {
+            await images.SetColorAsync(id, imageId, body.Color, http.User.ToActor(), ct);
             return Results.NoContent();
         });
 
