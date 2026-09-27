@@ -1,0 +1,44 @@
+@* Línea de tiempo del pedido. Distingue los cambios de estado de los eventos que no cambian el estado
+   (p. ej. "Comprobante de pago adjuntado"), para que un estado no aparezca repetido. *@
+<MudTimeline TimelinePosition="TimelinePosition.Start" Class="pa-0" data-testid="order-timeline">
+    @foreach (var h in History.Reverse())
+    {
+        var isEvent = h.From is { } from && from == h.To;
+        <MudTimelineItem Color="@(isEvent ? Color.Default : Ui.StatusColor(h.To))" Size="Size.Small"
+                         data-testid="@(isEvent ? "timeline-event" : "timeline-status")">
+            <MudText Typo="Typo.subtitle2">
+                @if (isEvent)
+                {
+                    <MudIcon Icon="@(h.ReceiptId is null ? Icons.Material.Filled.Info : Icons.Material.Filled.AttachFile)"
+                             Size="Size.Small" Style="vertical-align:middle" />
+                    @(h.Note ?? "Actualización del pedido")
+                }
+                else if (ShowTransition && h.From is { } previous)
+                {
+                    @($"{previous.DisplayName()} → {h.To.DisplayName()}")
+                }
+                else
+                {
+                    @h.To.DisplayName()
+                }
+            </MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                @Ui.Date(h.AtUtc)@(ShowActor ? $" · {h.ChangedBy}" : "")
+            </MudText>
+            @if (!isEvent && !string.IsNullOrWhiteSpace(h.Note))
+            {
+                <MudText Typo="Typo.body2">@h.Note</MudText>
+            }
+        </MudTimelineItem>
+    }
+</MudTimeline>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<OrderHistoryDto> History { get; set; } = [];
+
+    /// <summary>Muestra quién hizo cada cambio (auditoría del panel).</summary>
+    [Parameter] public bool ShowActor { get; set; }
+
+    /// <summary>Muestra "estado anterior → nuevo" (auditoría del panel).</summary>
+    [Parameter] public bool ShowTransition { get; set; }
+}

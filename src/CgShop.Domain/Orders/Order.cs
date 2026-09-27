@@ -133,7 +133,8 @@ public sealed class Order : Entity, ITenantEntity
     public void ValidatePayment(ActorInfo actor, string? note, DateTime nowUtc)
     {
         EnsureTenantAdmin(actor, "validar pagos");
-        ChangeStatus(OrderStatus.PaymentValidated, actor, note ?? "Pago validado manualmente.", nowUtc,
+        ChangeStatus(OrderStatus.PaymentValidated, actor,
+            string.IsNullOrWhiteSpace(note) ? "Pago validado manualmente." : note.Trim(), nowUtc,
             _receipts.LastOrDefault()?.Id);
         PaymentValidatedAtUtc = nowUtc;
         PaymentValidatedBy = actor.DisplayName;
@@ -211,7 +212,8 @@ public sealed class Order : Entity, ITenantEntity
 
     private void AddHistory(OrderStatus? from, OrderStatus to, ActorInfo actor, string? note, Guid? receiptId,
         DateTime nowUtc) =>
-        _history.Add(new OrderStatusHistory(Id, from, to, actor, note, receiptId, nowUtc) { TenantId = TenantId });
+        _history.Add(new OrderStatusHistory(Id, from, to, actor, string.IsNullOrWhiteSpace(note) ? null : note.Trim(),
+            receiptId, nowUtc) { TenantId = TenantId });
 
     private static void EnsureTenantAdmin(ActorInfo actor, string action)
     {

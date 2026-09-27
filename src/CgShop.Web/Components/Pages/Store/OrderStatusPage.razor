@@ -91,15 +91,7 @@ else
 
             <MudPaper Class="pa-6" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">Seguimiento</MudText>
-                <MudTimeline TimelinePosition="TimelinePosition.Start" Class="pa-0">
-                    @foreach (var h in _order.History.Reverse())
-                    {
-                        <MudTimelineItem Color="@Ui.StatusColor(h.To)" Size="Size.Small">
-                            <MudText Typo="Typo.subtitle2">@h.To.DisplayName()</MudText>
-                            <MudText Typo="Typo.caption">@Ui.Date(h.AtUtc) @(h.Note is null ? "" : $"· {h.Note}")</MudText>
-                        </MudTimelineItem>
-                    }
-                </MudTimeline>
+                <OrderTimeline History="_order.History" />
                 @if (_order.Receipts.Count > 0)
                 {
                     <MudText Typo="Typo.subtitle2" Class="mt-2">Comprobantes enviados</MudText>

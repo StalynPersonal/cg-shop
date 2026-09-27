@@ -155,6 +155,17 @@ public class OrderTests
         order.Status.Should().Be(OrderStatus.Cancelled);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Empty_validation_note_is_stored_as_default_text(string? note)
+    {
+        var order = TestData.Order(1);
+        order.ValidatePayment(TestData.TenantAdmin, note, TestData.Now);
+        order.History[^1].Note.Should().Be("Pago validado manualmente.");
+    }
+
     [Fact]
     public void Rejected_payment_is_terminal_and_requires_reason()
     {

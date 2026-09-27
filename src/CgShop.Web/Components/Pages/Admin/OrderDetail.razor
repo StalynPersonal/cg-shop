@@ -134,21 +134,7 @@ else
             </MudPaper>
             <MudPaper Class="pa-4" Outlined="true">
                 <MudText Typo="Typo.h6" Class="mb-2">Auditoría</MudText>
-                <MudTimeline TimelinePosition="TimelinePosition.Start" Class="pa-0">
-                    @foreach (var h in _order.History.Reverse())
-                    {
-                        <MudTimelineItem Color="@Ui.StatusColor(h.To)" Size="Size.Small">
-                            <MudText Typo="Typo.subtitle2">
-                                @(h.From is { } from && from != h.To ? $"{from.DisplayName()} → " : "")@h.To.DisplayName()
-                            </MudText>
-                            <MudText Typo="Typo.caption">@Ui.Date(h.AtUtc) · @h.ChangedBy</MudText>
-                            @if (h.Note is not null)
-                            {
-                                <MudText Typo="Typo.body2">@h.Note</MudText>
-                            }
-                        </MudTimelineItem>
-                    }
-                </MudTimeline>
+                <OrderTimeline History="_order.History" ShowActor="true" ShowTransition="true" />
             </MudPaper>
         </MudItem>
     </MudGrid>
