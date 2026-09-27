@@ -8,69 +8,74 @@
     </Authorized>
 </AuthorizeView>
 <MudLayout>
-    <MudAppBar Elevation="1" Color="Color.Primary" Gutters="true">
-        @* Menú ☰ en celular y tablet: categorías y cuenta *@
-        <MudHidden Breakpoint="Breakpoint.LgAndUp">
-            <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
-                           OnClick="() => _menuOpen = true" aria-label="Menú" data-testid="store-menu" />
-        </MudHidden>
-        <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="d-flex align-center gap-2 cg-appbar-title">
-            @if (Host.Tenant?.LogoUrl is { } logo)
-            {
-                <img src="@logo" alt="@Host.Tenant.Name" style="height:36px" />
-            }
-            else
-            {
-                <MudIcon Icon="@Icons.Material.Filled.Storefront" />
-            }
-            <MudText Typo="Typo.h6" Class="cg-appbar-title" data-testid="store-name">@Host.Tenant?.Name</MudText>
-        </MudLink>
-        @* Buscador centrado en escritorio; en celular va en su propia franja debajo. *@
-        <MudHidden Breakpoint="Breakpoint.SmAndDown">
-            <StoreSearchBox Class="mx-6" />
-        </MudHidden>
-        <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
-            <MudSpacer />
-        </MudHidden>
-        @* Escritorio: botones con texto. Celular: solo íconos (el resto está en el menú ☰). *@
-        <MudHidden Breakpoint="Breakpoint.Xs">
-            <AuthorizeView>
-                <Authorized>
-                    @if (IsStaff(context.User))
-                    {
-                        <MudButton Href="/admin" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Dashboard"
-                                   data-testid="nav-admin">Panel</MudButton>
-                    }
-                    else
-                    {
-                        <MudButton Href="/mi-cuenta" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.AccountCircle"
-                                   data-testid="nav-account">Mi cuenta</MudButton>
-                    }
-                    <LogoutButton />
-                </Authorized>
-                <NotAuthorized>
-                    <MudButton Href="/cuenta/login" Color="Color.Inherit" StartIcon="@Icons.Material.Filled.Login"
-                               data-testid="nav-login">Ingresar</MudButton>
-                </NotAuthorized>
-            </AuthorizeView>
-        </MudHidden>
-        <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
-            <AuthorizeView>
-                <Authorized>
-                    <MudIconButton Href="@(IsStaff(context.User) ? "/admin" : "/mi-cuenta")" Color="Color.Inherit"
-                                   Icon="@(IsStaff(context.User) ? Icons.Material.Filled.Dashboard : Icons.Material.Filled.AccountCircle)"
-                                   aria-label="Mi cuenta" />
-                </Authorized>
-                <NotAuthorized>
-                    <MudIconButton Href="/cuenta/login" Color="Color.Inherit" Icon="@Icons.Material.Filled.Login"
-                                   aria-label="Ingresar" />
-                </NotAuthorized>
-            </AuthorizeView>
-        </MudHidden>
-        <MudBadge Content="@Cart.Count" Visible="@(Cart.Count > 0)" Color="Color.Secondary" Overlap="true" Class="ml-1">
-            <MudIconButton Href="/carrito" Icon="@Icons.Material.Filled.ShoppingCart" Color="Color.Inherit"
-                           aria-label="Carrito" />
-        </MudBadge>
+    <MudAppBar Elevation="1" Color="Color.Primary" Gutters="false">
+        @* Mismo ancho que el contenido: logo | buscador | cuenta · carrito (como las tiendas departamentales). *@
+        <MudContainer MaxWidth="MaxWidth.Large" Class="d-flex align-center cg-header">
+            @* Menú ☰ en celular y tablet: secciones, categorías y cuenta *@
+            <MudHidden Breakpoint="Breakpoint.LgAndUp">
+                <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+                               OnClick="() => _menuOpen = true" aria-label="Menú" data-testid="store-menu" />
+            </MudHidden>
+            <MudLink Href="/" Color="Color.Inherit" Underline="Underline.None" Class="d-flex align-center gap-2 cg-appbar-title">
+                @if (Host.Tenant?.LogoUrl is { } logo)
+                {
+                    <img src="@logo" alt="@Host.Tenant.Name" style="height:36px" />
+                }
+                else
+                {
+                    <MudIcon Icon="@Icons.Material.Filled.Storefront" />
+                }
+                <MudText Typo="Typo.h6" Class="cg-appbar-title" data-testid="store-name">@Host.Tenant?.Name</MudText>
+            </MudLink>
+            @* Buscador al centro en escritorio; en celular va en su propia franja debajo. *@
+            <MudHidden Breakpoint="Breakpoint.SmAndDown">
+                <StoreSearchBox Class="cg-header-search" />
+            </MudHidden>
+            <MudHidden Breakpoint="Breakpoint.SmAndDown" Invert="true">
+                <MudSpacer />
+            </MudHidden>
+            @* Escritorio: cuenta con texto, separada del carrito. Celular: solo íconos. *@
+            <MudHidden Breakpoint="Breakpoint.Xs">
+                <div class="cg-header-actions">
+                    <AuthorizeView>
+                        <Authorized>
+                            @if (IsStaff(context.User))
+                            {
+                                <MudButton Href="/admin" Color="Color.Inherit" StartIcon="@Icons.Material.Outlined.Dashboard"
+                                           Class="cg-header-action" data-testid="nav-admin">Panel</MudButton>
+                            }
+                            else
+                            {
+                                <MudButton Href="/mi-cuenta" Color="Color.Inherit" StartIcon="@Icons.Material.Outlined.AccountCircle"
+                                           Class="cg-header-action" data-testid="nav-account">Mi cuenta</MudButton>
+                            }
+                            <LogoutButton IconOnly="true" />
+                        </Authorized>
+                        <NotAuthorized>
+                            <MudButton Href="/cuenta/login" Color="Color.Inherit" StartIcon="@Icons.Material.Outlined.AccountCircle"
+                                       Class="cg-header-action" data-testid="nav-login">Iniciar sesión</MudButton>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </MudHidden>
+            <MudHidden Breakpoint="Breakpoint.Xs" Invert="true">
+                <AuthorizeView>
+                    <Authorized>
+                        <MudIconButton Href="@(IsStaff(context.User) ? "/admin" : "/mi-cuenta")" Color="Color.Inherit"
+                                       Icon="@(IsStaff(context.User) ? Icons.Material.Outlined.Dashboard : Icons.Material.Outlined.AccountCircle)"
+                                       aria-label="Mi cuenta" />
+                    </Authorized>
+                    <NotAuthorized>
+                        <MudIconButton Href="/cuenta/login" Color="Color.Inherit" Icon="@Icons.Material.Outlined.AccountCircle"
+                                       aria-label="Iniciar sesión" />
+                    </NotAuthorized>
+                </AuthorizeView>
+            </MudHidden>
+            <MudBadge Content="@Cart.Count" Visible="@(Cart.Count > 0)" Color="Color.Secondary" Overlap="true" Class="cg-header-cart">
+                <MudIconButton Href="/carrito" Icon="@Icons.Material.Outlined.ShoppingBag" Color="Color.Inherit"
+                               aria-label="Carrito" />
+            </MudBadge>
+        </MudContainer>
     </MudAppBar>
 
     <MudDrawer @bind-Open="_menuOpen" Variant="DrawerVariant.Temporary" Anchor="Anchor.Start" Elevation="2"

@@ -380,3 +380,18 @@ html, body {
 @media (max-width: 600px) {
     .cg-toolbar-search, .cg-toolbar-filter { flex-basis: 100%; }
 }
+
+/* Cabecera de la tienda alineada al contenido: logo | buscador | cuenta · carrito. */
+.cg-header { gap: 8px; }
+.cg-search.cg-header-search { max-width: 760px; margin-inline: 40px; }
+.cg-header-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.cg-header-action.mud-button-root { text-transform: none; font-weight: 600; font-size: 1rem; white-space: nowrap; }
+.cg-header-cart { margin-left: 24px; }
+
+@media (max-width: 1279.98px) {
+    .cg-search.cg-header-search { margin-inline: 24px; }
+}
+
+@media (max-width: 599.98px) {
+    .cg-header-cart { margin-left: 4px; }
+}
