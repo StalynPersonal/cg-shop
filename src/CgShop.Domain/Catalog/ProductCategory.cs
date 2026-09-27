@@ -6,7 +6,11 @@ public enum ProductCategory
     Caps = 2,
     Watches = 3,
     Perfumes = 4,
-    Footwear = 5
+    Footwear = 5,
+    Phones = 6,
+
+    /// <summary>Audífonos, AirPods, cargadores, bocinas, relojes inteligentes y accesorios.</summary>
+    Electronics = 7
 }
 
 public static class ProductCategoryExtensions
@@ -18,8 +22,14 @@ public static class ProductCategoryExtensions
         ProductCategory.Watches => "Relojes",
         ProductCategory.Perfumes => "Perfumes",
         ProductCategory.Footwear => "Calzados",
+        ProductCategory.Phones => "Celulares",
+        ProductCategory.Electronics => "Electrónica",
         _ => category.ToString()
     };
+
+    /// <summary>Nombre de la dimensión "talla" según la categoría: en celulares es la capacidad.</summary>
+    public static string SizeLabel(this ProductCategory category) =>
+        category == ProductCategory.Phones ? "Capacidad" : "Talla";
 
     /// <summary>Qué dimensiones de variante son relevantes por categoría (usado por la UI y validaciones).</summary>
     public static (bool Size, bool Color, bool Volume) VariantDimensions(this ProductCategory category) => category switch
@@ -29,6 +39,8 @@ public static class ProductCategoryExtensions
         ProductCategory.Watches => (false, true, false),
         ProductCategory.Perfumes => (false, false, true),
         ProductCategory.Footwear => (true, true, false),
+        ProductCategory.Phones => (true, true, false),      // "talla" = capacidad (128 GB...)
+        ProductCategory.Electronics => (false, true, false),
         _ => (false, false, false)
     };
 }

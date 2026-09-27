@@ -102,7 +102,7 @@ else
                     <MudItem xs="12" sm="6"><MudTextField @bind-Value="_variant.Sku" Label="SKU" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
                     @if (Dimensions.Size)
                     {
-                        <MudItem xs="6" sm="3"><MudTextField @bind-Value="_variant.Size" Label="Talla" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
+                        <MudItem xs="6" sm="3"><MudTextField @bind-Value="_variant.Size" Label="@_product.Category.SizeLabel()" Placeholder="@(_product.Category == ProductCategory.Phones ? "128 GB" : null)" Variant="Variant.Outlined" Margin="Margin.Dense" /></MudItem>
                     }
                     @if (Dimensions.Color)
                     {
@@ -152,7 +152,7 @@ else
 
     private string DimensionsText => string.Join(", ", new[]
     {
-        Dimensions.Size ? "talla" : null, Dimensions.Color ? "color" : null, Dimensions.Volume ? "volumen" : null
+        Dimensions.Size ? _product.Category.SizeLabel().ToLowerInvariant() : null, Dimensions.Color ? "color" : null, Dimensions.Volume ? "volumen" : null
     }.Where(x => x is not null));
 
     private string AttributeHint => _product.Category switch
@@ -160,6 +160,8 @@ else
         ProductCategory.Perfumes => "Sugeridos: NotasSalida, NotasCorazon, NotasFondo, Concentracion",
         ProductCategory.Watches => "Sugeridos: Movimiento, Resistencia, Caja, Correa",
         ProductCategory.Footwear => "Sugeridos: Material, Suela, Uso",
+        ProductCategory.Phones => "Sugeridos: Pantalla, Camara, Bateria, Procesador, Garantia",
+        ProductCategory.Electronics => "Sugeridos: Conectividad, Bateria, Compatibilidad, Garantia",
         ProductCategory.Clothing => "Sugeridos: Material, Corte, Cuidado",
         _ => "Sugeridos: Material, Ajuste"
     };

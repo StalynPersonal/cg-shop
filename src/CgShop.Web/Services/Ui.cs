@@ -53,6 +53,8 @@ public static class Ui
         ProductCategory.Watches => Icons.Material.Filled.Watch,
         ProductCategory.Perfumes => Icons.Material.Filled.Spa,
         ProductCategory.Footwear => Icons.Material.Filled.DirectionsRun,
+        ProductCategory.Phones => Icons.Material.Filled.PhoneIphone,
+        ProductCategory.Electronics => Icons.Material.Filled.Headphones,
         _ => Icons.Material.Filled.Category
     };
 
@@ -63,6 +65,8 @@ public static class Ui
         ProductCategory.Watches => "relojes",
         ProductCategory.Perfumes => "perfumes",
         ProductCategory.Footwear => "calzados",
+        ProductCategory.Phones => "celulares",
+        ProductCategory.Electronics => "electronica",
         _ => category.ToString().ToLowerInvariant()
     };
 

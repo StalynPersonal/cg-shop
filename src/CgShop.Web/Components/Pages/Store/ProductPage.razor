@@ -36,7 +36,7 @@ else
                 @if (_sizes.Count > 0)
                 {
                     <div>
-                        <MudText Typo="Typo.subtitle2">Talla: <b data-testid="selected-size">@_size</b></MudText>
+                        <MudText Typo="Typo.subtitle2">@_product.Category.SizeLabel(): <b data-testid="selected-size">@_size</b></MudText>
                         <MudChipSet T="string" SelectedValue="_size" SelectedValueChanged="SelectSize" SelectionMode="SelectionMode.SingleSelection"
                                     CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
                             @foreach (var s in _sizes)
@@ -140,7 +140,7 @@ else
             new(_product.Category.DisplayName(), $"/catalogo/{Ui.CategorySlug(_product.Category)}"),
             new(_product.Name, null, disabled: true)
         ];
-        _sizes = CatalogServiceSizes(_product.Variants.Where(v => v.Size != null).Select(v => v.Size!));
+        _sizes = CatalogService.SortSizes(_product.Variants.Where(v => v.Size != null).Select(v => v.Size!).Distinct());
         _colors = _product.Variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList();
         _volumes = _product.Variants.Where(v => v.VolumeMl != null).Select(v => v.VolumeMl!.Value).Distinct().Order().ToList();
 
@@ -151,9 +151,6 @@ else
         _volume = first.VolumeMl;
         Resolve();
     }
-
-    private static List<string> CatalogServiceSizes(IEnumerable<string> sizes) =>
-        sizes.Distinct().OrderBy(s => decimal.TryParse(s, out var n) ? n : decimal.MaxValue).ThenBy(s => s).ToList();
 
     /// <summary>Una talla o color se puede elegir si tiene stock en alguna combinación; la otra dimensión se ajusta sola.</summary>
     private bool IsAvailable(string? size = null, string? color = null) =>

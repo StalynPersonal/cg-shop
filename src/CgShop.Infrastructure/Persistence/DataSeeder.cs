@@ -133,7 +133,8 @@ public sealed class DataSeeder(
 
     /// <summary>
     /// Asigna Hombre/Mujer/Niños a los productos demo creados antes de existir las secciones
-    /// y agrega los productos infantiles que falten. Solo toca productos que siguen como Unisex.
+    /// y agrega los productos demo que se sumaron después (infantiles, celulares y electrónica).
+    /// Solo cambia el público de productos que siguen como Unisex.
     /// </summary>
     private async Task BackfillDemoAudiencesAsync(CancellationToken ct)
     {
@@ -149,7 +150,7 @@ public sealed class DataSeeder(
 
             var slugs = existing.Select(p => p.Slug).ToHashSet();
             tenantDb.Products.AddRange(DemoCatalog.Build(tenant.Slug)
-                .Where(p => p.Audience == ProductAudience.Kids && !slugs.Contains(p.Slug)));
+                .Where(p => DemoCatalog.AddedLater(p) && !slugs.Contains(p.Slug)));
             await tenantDb.SaveChangesAsync(ct);
         }
     }
@@ -266,12 +267,48 @@ internal static class DemoCatalog
         foreach (var size in new[] { "28", "29", "30", "31", "32", "33" })
             tenisNinos.AddVariant($"{p}-REVK-RS-{size}", 3900, 3, size, "Rosado");
 
+        var iphone = Product.Create("iPhone 15", ProductCategory.Phones, "Apple",
+            "Pantalla Super Retina XDR de 6.1'', Dynamic Island y cámara de 48 MP.", null,
+            new Dictionary<string, string> { ["Pantalla"] = "6.1 pulgadas", ["Camara"] = "48 MP", ["Garantia"] = "1 año" });
+        foreach (var (capacity, price) in new[] { ("128 GB", 62900m), ("256 GB", 69900m) })
+        {
+            iphone.AddVariant($"{p}-IP15-NG-{capacity[..3]}", price, 3, capacity, "Negro");
+            iphone.AddVariant($"{p}-IP15-AZ-{capacity[..3]}", price, 2, capacity, "Azul");
+        }
+
+        var galaxy = Product.Create("Samsung Galaxy A55", ProductCategory.Phones, "Samsung",
+            "Pantalla Super AMOLED de 6.6'' y batería de 5000 mAh.", null,
+            new Dictionary<string, string> { ["Pantalla"] = "6.6 pulgadas", ["Bateria"] = "5000 mAh", ["Garantia"] = "1 año" });
+        foreach (var (capacity, price) in new[] { ("128 GB", 24900m), ("256 GB", 27900m) })
+            galaxy.AddVariant($"{p}-A55-AZ-{capacity[..3]}", price, 4, capacity, "Azul");
+
+        var airpods = Product.Create("AirPods Pro (2da generación)", ProductCategory.Electronics, "Apple",
+            "Cancelación activa de ruido y estuche de carga MagSafe USB-C.", null,
+            new Dictionary<string, string> { ["Conectividad"] = "Bluetooth 5.3", ["Bateria"] = "Hasta 30 h con estuche" });
+        airpods.AddVariant($"{p}-APP2-BL", 15900, 5, color: "Blanco");
+
+        var cargador = Product.Create("Cargador USB-C 20W", ProductCategory.Electronics, "Apple",
+            "Carga rápida para iPhone y AirPods.", null,
+            new Dictionary<string, string> { ["Compatibilidad"] = "iPhone, iPad y AirPods" });
+        cargador.AddVariant($"{p}-USBC20-BL", 1650, 12, color: "Blanco");
+
+        var bocina = Product.Create("Bocina JBL Flip 6", ProductCategory.Electronics, "JBL",
+            "Bocina portátil resistente al agua IP67.", null,
+            new Dictionary<string, string> { ["Conectividad"] = "Bluetooth", ["Bateria"] = "12 h" });
+        bocina.AddVariant($"{p}-FLIP6-NG", 7450, 4, color: "Negro");
+        bocina.AddVariant($"{p}-FLIP6-AZ", 7450, 3, color: "Azul");
+
         Product[] products = [polo, jeans, gorra, gorraTrucker, reloj, relojAuto, perfume, perfume2, tenis, botas,
-            camisetaNinos, tenisNinos];
+            camisetaNinos, tenisNinos, iphone, galaxy, airpods, cargador, bocina];
         foreach (var product in products)
             product.SetAudience(AudienceFor(product.Name));
         return products;
     }
+
+    /// <summary>Productos demo agregados después de la primera versión (se completan en bases ya sembradas).</summary>
+    public static bool AddedLater(Product product) =>
+        product.Audience == ProductAudience.Kids
+        || product.Category is ProductCategory.Phones or ProductCategory.Electronics;
 
     /// <summary>Público de cada producto demo; lo no listado es Unisex.</summary>
     public static ProductAudience AudienceFor(string name) => name switch

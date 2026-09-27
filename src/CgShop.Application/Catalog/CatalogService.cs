@@ -33,8 +33,8 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
             }
 
             var categories = Enum.GetValues<ProductCategory>()
-                .Where(c => c.DisplayName().StartsWith(word, StringComparison.OrdinalIgnoreCase)
-                            || word.StartsWith(c.DisplayName().TrimEnd('s'), StringComparison.OrdinalIgnoreCase))
+                .Where(c => Plain(c.DisplayName()).StartsWith(Plain(word), StringComparison.OrdinalIgnoreCase)
+                            || Plain(word).StartsWith(Plain(c.DisplayName()).TrimEnd('s'), StringComparison.OrdinalIgnoreCase))
                 .ToList();
             products = products.Where(p =>
                 p.Name.ToLower().Contains(word)
@@ -153,17 +153,36 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         _ => null
     };
 
-    internal static List<string> SortSizes(IEnumerable<string> sizes)
+    /// <summary>Orden natural de tallas: numéricas (38, 40.5), capacidades (64 GB, 1 TB) y luego XS..XXL.</summary>
+    public static List<string> SortSizes(IEnumerable<string> sizes)
     {
         string[] clothingOrder = ["XS", "S", "M", "L", "XL", "XXL", "S/M", "L/XL", "Ajustable"];
-        var inv = System.Globalization.CultureInfo.InvariantCulture;
         return sizes
-            .OrderBy(s => decimal.TryParse(s, inv, out _) ? 0 : 1)
-            .ThenBy(s => decimal.TryParse(s, inv, out var n) ? n : 0)
+            .OrderBy(s => NumericSize(s) is null ? 1 : 0)
+            .ThenBy(s => NumericSize(s) ?? 0)
             .ThenBy(s => Array.IndexOf(clothingOrder, s) is var i and >= 0 ? i : int.MaxValue)
             .ThenBy(s => s, StringComparer.Ordinal)
             .ToList();
     }
+
+    /// <summary>Valor numérico de una talla ("40.5") o capacidad en GB ("256 GB", "1 TB" = 1024).</summary>
+    private static decimal? NumericSize(string size)
+    {
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var s = size.Trim();
+        var factor = 1m;
+        if (s.EndsWith("TB", StringComparison.OrdinalIgnoreCase))
+            factor = 1024m;
+        if (s.EndsWith("GB", StringComparison.OrdinalIgnoreCase) || s.EndsWith("TB", StringComparison.OrdinalIgnoreCase))
+            s = s[..^2].Trim();
+        return decimal.TryParse(s, System.Globalization.NumberStyles.Number, inv, out var n) ? n * factor : null;
+    }
+
+    /// <summary>Texto sin tildes (para comparar "electronica" con "Electrónica").</summary>
+    private static string Plain(string text) =>
+        new(text.Normalize(System.Text.NormalizationForm.FormD)
+            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c) != System.Globalization.UnicodeCategory.NonSpacingMark)
+            .ToArray());
 
     internal static VariantDto ToDto(ProductVariant v) =>
         new(v.Id, v.Sku, v.Size, v.Color, v.VolumeMl, v.Price, v.Available, v.Description);

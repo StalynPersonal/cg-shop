@@ -44,7 +44,7 @@
                 {
                     @if (_facets.Sizes.Count > 0)
                     {
-                        <MudSelect T="string" Label="Talla" @bind-Value="_size" @bind-Value:after="ReloadAsync"
+                        <MudSelect T="string" Label="@(_category == ProductCategory.Phones ? "Capacidad" : "Talla")" @bind-Value="_size" @bind-Value:after="ReloadAsync"
                                    Clearable="true" Variant="Variant.Outlined" Margin="Margin.Dense">
                             @foreach (var s in _facets.Sizes)
                             {
