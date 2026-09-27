@@ -86,13 +86,6 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         return new PagedResult<ProductCardDto>(items, total, page, pageSize);
     }
 
-    /// <summary>Estados en los que un pedido cuenta como venta (pago validado en adelante).</summary>
-    private static readonly OrderStatus[] SoldStatuses =
-    [
-        OrderStatus.PaymentValidated, OrderStatus.Preparing, OrderStatus.Shipped, OrderStatus.ReadyForPickup,
-        OrderStatus.Delivered
-    ];
-
     /// <summary>
     /// Productos en tendencia: los más vendidos (unidades) en los últimos <paramref name="days"/> días.
     /// Si hay pocas ventas, se completa con las novedades para que la sección no quede vacía.
@@ -105,7 +98,7 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         await using var db = dbFactory.CreateDbContext();
 
         var ranking = await db.OrderItems
-            .Where(i => db.Orders.Any(o => o.Id == i.OrderId && SoldStatuses.Contains(o.Status) && o.CreatedAtUtc >= since))
+            .Where(i => db.Orders.Any(o => o.Id == i.OrderId && OrderStateMachine.PaidStatuses.Contains(o.Status) && o.CreatedAtUtc >= since))
             .GroupBy(i => i.ProductId) // copia en la línea: cuenta aunque la variante ya no exista
             .Select(g => new { ProductId = g.Key, Units = g.Sum(i => i.Quantity) })
             .OrderByDescending(x => x.Units)

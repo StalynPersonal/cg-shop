@@ -190,3 +190,23 @@ public static class ReceiptEndpoints
         return app;
     }
 }
+
+public static class ReportEndpoints
+{
+    /// <summary>Descarga CSV de cada sección del reporte (solo propietario): /admin/reportes/productos.csv?desde=...&hasta=...</summary>
+    public static IEndpointRouteBuilder MapReportEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/admin/reportes/{section}.csv", async (string section, DateOnly desde, DateOnly hasta,
+            CgShop.Application.Reports.ReportService reports, HttpContext http) =>
+        {
+            if (!CgShop.Application.Reports.ReportCsv.Sections.ContainsKey(section))
+                return Results.NotFound();
+            var report = await reports.GetSalesReportAsync(desde, hasta, http.User.ToActor(), http.RequestAborted);
+            http.Response.Headers.CacheControl = "private, no-store";
+            return Results.File(CgShop.Application.Reports.ReportCsv.Build(report, section), "text/csv; charset=utf-8",
+                CgShop.Application.Reports.ReportCsv.FileName(section, desde, hasta));
+        }).RequireAuthorization(Policies.TenantAdmin);
+
+        return app;
+    }
+}

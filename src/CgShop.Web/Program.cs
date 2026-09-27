@@ -102,6 +102,7 @@ app.UseAntiforgery();
 
 app.MapAccountEndpoints();
 app.MapReceiptEndpoints();
+app.MapReportEndpoints();
 app.MapProductImageEndpoints();
 
 app.MapRazorComponents<App>()

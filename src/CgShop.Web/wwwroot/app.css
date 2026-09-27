@@ -508,3 +508,22 @@ html, body {
 /* Historial de cambios del producto: una entrada por bloque, detalle debajo. */
 .cg-history-entry { padding: 10px 0; border-bottom: 1px solid var(--mud-palette-lines-default); }
 .cg-history-entry:last-child { border-bottom: 0; }
+
+/* Reportes */
+.cg-report-range { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.cg-report-picker { flex: 0 1 300px; min-width: 240px; }
+.cg-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.cg-kpi-value { font-size: clamp(1.15rem, 1.35vw, 1.6rem); font-weight: 700; margin-top: 4px; white-space: nowrap; }
+.cg-kpi.main .cg-kpi-value { color: var(--mud-palette-primary); }
+.cg-kpis-small .cg-kpi-value { font-size: 1.2rem; }
+.cg-kpi { overflow: hidden; }
+.cg-chart-wrap { overflow-x: auto; }
+.cg-table-scroll { overflow-x: auto; }
+.cg-table-scroll td, .cg-table-scroll th { white-space: nowrap; }
+.cg-csv-link { text-decoration: none; }
+
+@media (max-width: 600px) {
+    .cg-kpis { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .cg-kpi-value { font-size: 1.15rem; }
+    .cg-report-picker { flex-basis: 100%; }
+}

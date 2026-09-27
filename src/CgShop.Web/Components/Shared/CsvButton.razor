@@ -1,0 +1,14 @@
+@* Descarga CSV de una sección del reporte (el atributo download evita que el router de Blazor intercepte el enlace). *@
+@using CgShop.Application.Reports
+
+<a class="mud-button-root mud-button mud-button-text mud-button-text-primary mud-button-text-size-small mud-ripple cg-csv-link"
+   href="@Url" download="@ReportCsv.FileName(Section, Report.From, Report.To)" data-testid="@($"csv-{Section}")">
+    <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" Class="mr-1" /> Descargar CSV
+</a>
+
+@code {
+    [Parameter, EditorRequired] public string Section { get; set; } = "";
+    [Parameter, EditorRequired] public SalesReportDto Report { get; set; } = default!;
+
+    private string Url => $"/admin/reportes/{Section}.csv?desde={Report.From:yyyy-MM-dd}&hasta={Report.To:yyyy-MM-dd}";
+}

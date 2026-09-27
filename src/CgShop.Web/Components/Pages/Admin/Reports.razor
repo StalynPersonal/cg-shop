@@ -1,0 +1,203 @@
+@page "/admin/reportes"
+@attribute [Authorize(Policy = Policies.TenantAdmin)]
+@using CgShop.Application.Reports
+@inject ReportService ReportService
+@inject TimeProvider Clock
+
+<PageTitle>Reportes · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4">Reportes</MudText>
+<MudText Class="mud-text-secondary mb-4">
+    Ventas por rango de fechas (pedidos con pago validado, según la fecha del pedido, hora de República Dominicana).
+</MudText>
+
+<MudPaper Class="pa-4 mb-4" Outlined="true">
+    <div class="cg-report-range">
+        <MudChipSet T="string" SelectedValue="_preset" SelectedValueChanged="ApplyPresetAsync"
+                    SelectionMode="SelectionMode.SingleSelection" CheckMark="false" Color="Color.Primary" Variant="Variant.Outlined">
+            @foreach (var (key, label) in Presets)
+            {
+                <MudChip T="string" Value="@key" Text="@label" Class="@(key == _preset ? "cg-variant-chip selected" : "cg-variant-chip")"
+                         data-testid="@($"preset-{key}")" />
+            }
+        </MudChipSet>
+        <div class="cg-report-picker">
+            <MudDateRangePicker DateRange="_range" DateRangeChanged="OnRangeChangedAsync" Label="Rango personalizado"
+                            Variant="Variant.Outlined" Margin="Margin.Dense" DateFormat="dd/MM/yyyy"
+                            MaxDate="@Today.ToDateTime(TimeOnly.MinValue)" data-testid="report-range" />
+        </div>
+    </div>
+</MudPaper>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Warning" Class="mb-4">@_error</MudAlert>
+}
+@if (_report is null)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" />
+}
+else
+{
+    var s = _report.Summary;
+    <MudText Typo="Typo.subtitle1" Class="mb-2" data-testid="report-period">
+        Del <b>@_report.From.ToString("dd/MM/yyyy")</b> al <b>@_report.To.ToString("dd/MM/yyyy")</b>
+    </MudText>
+
+    <div class="cg-kpis mb-4">
+        <Kpi Label="Ventas (con ITBIS)" Value="@Ui.Money(s.Revenue, Currency)" Icon="@Icons.Material.Filled.Payments" Main="true" TestId="kpi-revenue" />
+        <Kpi Label="Pedidos pagados" Value="@s.PaidOrders.ToString("N0")" Icon="@Icons.Material.Filled.ShoppingBag" TestId="kpi-orders" />
+        <Kpi Label="Ticket promedio" Value="@Ui.Money(s.AverageTicket, Currency)" Icon="@Icons.Material.Filled.Receipt" TestId="kpi-ticket" />
+        <Kpi Label="Unidades vendidas" Value="@s.UnitsSold.ToString("N0")" Icon="@Icons.Material.Filled.Inventory2" TestId="kpi-units" />
+        <Kpi Label="ITBIS" Value="@Ui.Money(s.Tax, Currency)" Icon="@Icons.Material.Filled.AccountBalance" TestId="kpi-tax" />
+    </div>
+    <div class="cg-kpis cg-kpis-small mb-4">
+        <Kpi Label="Pendientes de pago" Value="@s.PendingOrders.ToString("N0")" TestId="kpi-pending" />
+        <Kpi Label="Cancelados" Value="@s.CancelledOrders.ToString("N0")" TestId="kpi-cancelled" />
+        <Kpi Label="Pagos rechazados" Value="@s.RejectedOrders.ToString("N0")" TestId="kpi-rejected" />
+        <Kpi Label="Vencidos sin pago" Value="@s.ExpiredOrders.ToString("N0")" TestId="kpi-expired" />
+    </div>
+
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+            <MudText Typo="Typo.h6">Ventas por día</MudText>
+            <CsvButton Section="diario" Report="_report" />
+        </div>
+        @if (s.PaidOrders == 0)
+        {
+            <MudText Class="mud-text-secondary my-4">No hubo ventas en este período.</MudText>
+        }
+        else
+        {
+            <div class="cg-chart-wrap">
+                <MudChart T="double" ChartType="ChartType.Bar" ChartSeries="_series" ChartLabels="_labels"
+                          Width="100%" Height="280px" data-testid="daily-chart" />
+            </div>
+        }
+    </MudPaper>
+
+    <MudTabs Outlined="true" Rounded="true" Border="true" ApplyEffectsToContainer="true" TabPanelsClass="pa-4"
+             data-testid="report-tabs">
+        <MudTabPanel Text="Productos más vendidos">
+            <SectionHeader Text="@($"Top {ReportService.TopCount} por unidades · ventas sin ITBIS")" Section="productos" Report="_report" />
+            <ReportTable Headers="@(["Producto", "Categoría", "Unidades", "Ventas"])"
+                         Rows="@(_report.TopProducts.Select(p => new[] { p.ProductName, CategoryName(p.Category), p.Units.ToString("N0"), Ui.Money(p.Revenue, Currency) }))"
+                         TestId="table-products" />
+        </MudTabPanel>
+        <MudTabPanel Text="Por categoría">
+            <SectionHeader Text="Ventas sin ITBIS" Section="categorias" Report="_report" />
+            <ReportTable Headers="@(["Categoría", "Unidades", "Ventas", "% de ventas"])"
+                         Rows="@(_report.ByCategory.Select(c => new[] { CategoryName(c.Category), c.Units.ToString("N0"), Ui.Money(c.Revenue, Currency), $"{c.Share:0.0} %" }))"
+                         TestId="table-categories" />
+        </MudTabPanel>
+        <MudTabPanel Text="Pago y entrega">
+            <SectionHeader Text="Pedidos pagados por forma de pago y de entrega" Section="pagos" Report="_report" />
+            <ReportTable Headers="@(["Tipo", "Opción", "Pedidos", "Ventas"])"
+                         Rows="@(_report.ByPaymentMethod.Select(b => new[] { "Pago", b.Label, b.Orders.ToString("N0"), Ui.Money(b.Revenue, Currency) })
+                                 .Concat(_report.ByDelivery.Select(b => new[] { "Entrega", b.Label, b.Orders.ToString("N0"), Ui.Money(b.Revenue, Currency) })))"
+                         TestId="table-payments" />
+        </MudTabPanel>
+        <MudTabPanel Text="Mejores clientes">
+            <SectionHeader Text="@($"Top {ReportService.TopCount} por monto comprado")" Section="clientes" Report="_report" />
+            <ReportTable Headers="@(["Cliente", "Correo", "Pedidos", "Total", "Última compra"])"
+                         Rows="@(_report.TopCustomers.Select(c => new[] { c.Name, c.Email, c.Orders.ToString("N0"), Ui.Money(c.Revenue, Currency), c.LastPurchase.ToString("dd/MM/yyyy") }))"
+                         TestId="table-customers" />
+        </MudTabPanel>
+        <MudTabPanel Text="Ajustes de inventario">
+            <SectionHeader Text="Ajustes manuales de stock por usuario (detalle en Movimientos de inventario)" Section="ajustes" Report="_report" />
+            <ReportTable Headers="@(["Usuario", "Rol", "Ajustes", "Entradas", "Salidas"])"
+                         Rows="@(_report.AdjustmentsByUser.Select(a => new[] { a.UserName, RoleLabel(a.UserRole), a.Adjustments.ToString("N0"), $"+{a.UnitsIn:N0}", $"-{a.UnitsOut:N0}" }))"
+                         TestId="table-adjustments" />
+        </MudTabPanel>
+        <MudTabPanel Text="Detalle por día">
+            <SectionHeader Text="Todos los días del rango" Section="diario" Report="_report" />
+            <ReportTable Headers="@(["Fecha", "Pedidos", "Unidades", "Ventas"])"
+                         Rows="@(_report.Daily.Select(d => new[] { d.Date.ToString("dd/MM/yyyy"), d.Orders.ToString("N0"), d.Units.ToString("N0"), Ui.Money(d.Revenue, Currency) }))"
+                         TestId="table-daily" />
+        </MudTabPanel>
+    </MudTabs>
+}
+
+@code {
+    private static readonly (string Key, string Label)[] Presets =
+    [
+        ("hoy", "Hoy"), ("ayer", "Ayer"), ("7d", "Últimos 7 días"), ("30d", "Últimos 30 días"),
+        ("mes", "Este mes"), ("mes-anterior", "Mes pasado"), ("anio", "Este año")
+    ];
+
+    private string? _preset = "mes";
+    private DateRange? _range;
+    private SalesReportDto? _report;
+    private string? _error;
+    private List<ChartSeries<double>> _series = [];
+    private string[] _labels = [];
+
+    private DateOnly Today => StoreTime.Today(Clock);
+
+    protected override async Task OnAdminInitializedAsync() => await ApplyPresetAsync(_preset);
+
+    private (DateOnly From, DateOnly To) RangeFor(string preset)
+    {
+        var today = Today;
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        return preset switch
+        {
+            "hoy" => (today, today),
+            "ayer" => (today.AddDays(-1), today.AddDays(-1)),
+            "7d" => (today.AddDays(-6), today),
+            "30d" => (today.AddDays(-29), today),
+            "mes-anterior" => (monthStart.AddMonths(-1), monthStart.AddDays(-1)),
+            "anio" => (new DateOnly(today.Year, 1, 1), today),
+            _ => (monthStart, today)
+        };
+    }
+
+    private async Task ApplyPresetAsync(string? preset)
+    {
+        if (preset is null)
+            return;
+        _preset = preset;
+        var (from, to) = RangeFor(preset);
+        _range = new DateRange(from.ToDateTime(TimeOnly.MinValue), to.ToDateTime(TimeOnly.MinValue));
+        await LoadAsync(from, to);
+    }
+
+    private async Task OnRangeChangedAsync(DateRange? range)
+    {
+        _range = range;
+        if (range?.Start is not { } start || range.End is not { } end)
+            return;
+        _preset = null;
+        await LoadAsync(DateOnly.FromDateTime(start), DateOnly.FromDateTime(end));
+    }
+
+    private async Task LoadAsync(DateOnly from, DateOnly to)
+    {
+        _error = null;
+        try
+        {
+            _report = await ReportService.GetSalesReportAsync(from, to, Actor);
+        }
+        catch (ValidationException ex)
+        {
+            _error = string.Join(" ", ex.Errors);
+            return;
+        }
+
+        // Como máximo ~12 etiquetas en el eje para que no se amontonen (el detalle está en la tabla por día).
+        var step = Math.Max(1, (int)Math.Ceiling(_report.Daily.Count / 12d));
+        _labels = _report.Daily.Select((d, i) => i % step == 0 || i == _report.Daily.Count - 1
+            ? d.Date.ToString(_report.Daily.Count <= 62 ? "dd/MM" : "dd/MM/yy")
+            : "").ToArray();
+        _series = [new ChartSeries<double> { Name = "Ventas", Data = new ChartData<double>(_report.Daily.Select(d => (double)d.Revenue).ToList()) }];
+    }
+
+    private static string CategoryName(CgShop.Domain.Catalog.ProductCategory? category) =>
+        category?.DisplayName() ?? "Producto eliminado";
+
+    private static string RoleLabel(string? role) => role switch
+    {
+        Roles.TenantAdmin => "Propietario",
+        Roles.TenantStaff => "Empleado",
+        _ => "—"
+    };
+}

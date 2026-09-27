@@ -1,6 +1,7 @@
 using CgShop.Application.Catalog;
 using CgShop.Application.Common;
 using CgShop.Application.Marketing;
+using CgShop.Application.Reports;
 using CgShop.Application.Orders;
 using CgShop.Application.Tenancy;
 using CgShop.Application.Tenants;
@@ -287,6 +288,11 @@ public static class AdminEndpoints
             await settings.UpdatePaymentSettingsAsync(body, http.User.ToActor(), ct);
             return Results.NoContent();
         }).RequireAuthorization(ApiPolicies.TenantAdmin);
+
+        // Reportes por rango de fechas (solo propietario). from/to: yyyy-MM-dd, días en hora de RD.
+        admin.MapGet("/reports/sales", (DateOnly from, DateOnly to, ReportService reports, HttpContext http,
+            CancellationToken ct) => reports.GetSalesReportAsync(from, to, http.User.ToActor(), ct))
+            .RequireAuthorization(ApiPolicies.TenantAdmin);
 
         // Carrusel de portada (solo propietario).
         var banners = admin.MapGroup("/banners").RequireAuthorization(ApiPolicies.TenantAdmin);

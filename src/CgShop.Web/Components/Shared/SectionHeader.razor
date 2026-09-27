@@ -1,0 +1,11 @@
+@using CgShop.Application.Reports
+<div class="d-flex align-center justify-space-between flex-wrap gap-2 mb-2">
+    <MudText Typo="Typo.body2" Class="mud-text-secondary">@Text</MudText>
+    <CsvButton Section="@Section" Report="Report" />
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Text { get; set; } = "";
+    [Parameter, EditorRequired] public string Section { get; set; } = "";
+    [Parameter, EditorRequired] public SalesReportDto Report { get; set; } = default!;
+}

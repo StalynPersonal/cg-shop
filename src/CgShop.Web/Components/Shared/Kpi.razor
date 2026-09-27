@@ -1,0 +1,19 @@
+@* Indicador de un reporte: etiqueta, valor e ícono opcional. *@
+<MudPaper Class="@($"cg-kpi pa-4 {(Main ? "main" : "")}")" Outlined="true" data-testid="@TestId">
+    <div class="d-flex align-center gap-2">
+        @if (Icon is not null)
+        {
+            <MudIcon Icon="@Icon" Color="Color.Primary" Size="Size.Small" />
+        }
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">@Label</MudText>
+    </div>
+    <div class="cg-kpi-value" data-testid="@($"{TestId}-value")">@Value</div>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = "";
+    [Parameter, EditorRequired] public string Value { get; set; } = "";
+    [Parameter] public string? Icon { get; set; }
+    [Parameter] public bool Main { get; set; }
+    [Parameter] public string? TestId { get; set; }
+}

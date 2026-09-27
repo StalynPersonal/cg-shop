@@ -1,0 +1,43 @@
+@* Tabla simple de reporte: columnas numéricas (todas menos las dos primeras) alineadas a la derecha. *@
+@if (_rows.Count == 0)
+{
+    <MudText Class="mud-text-secondary my-4">Sin datos en este período.</MudText>
+}
+else
+{
+    <div class="cg-table-scroll">
+        <MudSimpleTable Dense="true" Hover="true" Striped="true" data-testid="@TestId">
+            <thead>
+            <tr>
+                @foreach (var (header, index) in Headers.Select((h, i) => (h, i)))
+                {
+                    <th class="@(IsNumeric(index) ? "text-right" : "")">@header</th>
+                }
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in _rows)
+            {
+                <tr>
+                    @foreach (var (cell, index) in row.Select((c, i) => (c, i)))
+                    {
+                        <td class="@(IsNumeric(index) ? "text-right" : "")">@cell</td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </MudSimpleTable>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<string> Headers { get; set; } = [];
+    [Parameter, EditorRequired] public IEnumerable<string[]> Rows { get; set; } = [];
+    [Parameter] public string? TestId { get; set; }
+
+    private List<string[]> _rows = [];
+
+    protected override void OnParametersSet() => _rows = Rows.ToList();
+
+    private bool IsNumeric(int index) => index >= 2 && !Headers[index].Contains("Correo");
+}
