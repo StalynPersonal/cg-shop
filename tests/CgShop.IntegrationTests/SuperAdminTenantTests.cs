@@ -7,6 +7,7 @@ using CgShop.Infrastructure.Identity;
 using CgShop.IntegrationTests.Infrastructure;
 using CgShop.Tests.Shared;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CgShop.IntegrationTests;
@@ -121,6 +122,61 @@ public sealed class SuperAdminTenantTests(SqlServerFixture fx)
         var summary = await service.GetAsync(id);
         summary!.Name.Should().Be("Nuevo nombre");
         summary.TaxRate.Should().Be(0.16m);
+    }
+
+    [Fact]
+    public async Task Updating_payment_settings_reusing_tracked_bank_accounts_persists_100_times()
+    {
+        var tenant = await fx.CreateTenantAsync();
+        for (var i = 0; i < TestData.BatchSize; i++)
+        {
+            await using var scope = fx.NoTenantScope();
+            var db = scope.ServiceProvider.GetRequiredService<CgShop.Infrastructure.Persistence.AppDbContext>();
+            var tracked = await db.Tenants.FirstAsync(t => t.Id == tenant.Id);
+            var ps = tracked.PaymentSettings;
+
+            // Reutiliza la MISMA lista rastreada (caso que rompía el backfill del seed).
+            tracked.UpdatePaymentSettings(new PaymentSettings
+            {
+                BankAccounts = ps.BankAccounts, PaymentLinkUrl = ps.PaymentLinkUrl,
+                WhatsAppNumber = $"809-555-{i:0000}", PickupAddress = $"Local {i}"
+            });
+            await db.SaveChangesAsync();
+        }
+
+        await using var verify = fx.NoTenantScope();
+        var saved = await verify.ServiceProvider.GetRequiredService<CgShop.Infrastructure.Persistence.AppDbContext>()
+            .Tenants.AsNoTracking().FirstAsync(t => t.Id == tenant.Id);
+        saved.PaymentSettings.WhatsAppNumber.Should().Be("809-555-0099");
+        saved.PaymentSettings.BankAccounts.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Seeder_backfills_existing_demo_stores_and_is_idempotent()
+    {
+        await using (var scope = fx.NoTenantScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CgShop.Infrastructure.Persistence.AppDbContext>();
+            var verde = await db.Tenants.FirstAsync(t => t.Slug == "verde");
+            var ps = verde.PaymentSettings;
+            verde.UpdatePaymentSettings(new PaymentSettings { BankAccounts = ps.BankAccounts, PaymentLinkUrl = ps.PaymentLinkUrl });
+            await db.SaveChangesAsync(); // simula una base creada antes de WhatsApp/retiro
+        }
+
+        for (var run = 0; run < 2; run++)
+        {
+            await using var scope = fx.SystemScope();
+            await scope.ServiceProvider.GetRequiredService<CgShop.Infrastructure.Persistence.DataSeeder>().SeedAsync(migrate: false);
+        }
+
+        await using var check = fx.NoTenantScope();
+        var store = check.ServiceProvider.GetRequiredService<ITenantStore>();
+        var info = await store.FindBySlugAsync("verde");
+        var tenant = await check.ServiceProvider.GetRequiredService<CgShop.Infrastructure.Persistence.AppDbContext>()
+            .Tenants.AsNoTracking().FirstAsync(t => t.Id == info!.Id);
+        tenant.PaymentSettings.WhatsAppNumber.Should().NotBeNullOrEmpty();
+        tenant.PaymentSettings.PickupAddress.Should().NotBeNullOrEmpty();
+        tenant.PaymentSettings.BankAccounts.Should().NotBeEmpty();
     }
 
     [Fact]

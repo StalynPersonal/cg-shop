@@ -103,7 +103,23 @@ public sealed partial class Tenant : Entity
                 throw new DomainException("Cada cuenta bancaria requiere banco, número y titular.");
         }
 
-        PaymentSettings = settings;
+        // Copia defensiva: nunca reutilizar instancias ya rastreadas por EF (columna JSON propia);
+        // reasignarlas a un nuevo PaymentSettings rompe la clave sintetizada del owned collection.
+        PaymentSettings = new PaymentSettings
+        {
+            BankAccounts = settings.BankAccounts.Select(b => new BankAccount
+            {
+                BankName = b.BankName.Trim(),
+                AccountNumber = b.AccountNumber.Trim(),
+                AccountHolder = b.AccountHolder.Trim(),
+                AccountType = b.AccountType,
+                HolderDocument = string.IsNullOrWhiteSpace(b.HolderDocument) ? null : b.HolderDocument.Trim()
+            }).ToList(),
+            PaymentLinkUrl = string.IsNullOrWhiteSpace(settings.PaymentLinkUrl) ? null : settings.PaymentLinkUrl.Trim(),
+            Instructions = string.IsNullOrWhiteSpace(settings.Instructions) ? null : settings.Instructions.Trim(),
+            PickupAddress = string.IsNullOrWhiteSpace(settings.PickupAddress) ? null : settings.PickupAddress.Trim(),
+            WhatsAppNumber = string.IsNullOrWhiteSpace(settings.WhatsAppNumber) ? null : settings.WhatsAppNumber.Trim()
+        };
     }
 
     public void Suspend() => Status = TenantStatus.Suspended;
