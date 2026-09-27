@@ -1,0 +1,107 @@
+CG SHOP - ACCESOS DE DESARROLLO
+================================
+Solo para entorno local (Development). Estos usuarios los crea el seed automáticamente.
+NO usar estas credenciales en producción.
+
+
+1. CÓMO ARRANCAR
+----------------
+Portal web (obligatorio):
+    cd C:\Users\scontreras\Desktop\mio\cg-shop
+    dotnet run --project src/CgShop.Web --launch-profile http
+
+API REST (opcional):
+    dotnet run --project src/CgShop.Api --launch-profile http
+
+Esperar el mensaje "Now listening on: http://localhost:5091" y dejar la terminal abierta.
+Detener con Ctrl+C.
+
+
+2. CONTRASEÑA (todos los usuarios demo)
+---------------------------------------
+    Admin123!
+
+
+3. SUPER ADMIN (crea empresas y define su color)
+------------------------------------------------
+    URL:        http://admin.localhost:5091
+    Usuario:    superadmin@cgshop.local
+    Contraseña: Admin123!
+
+    Nueva empresa:  http://admin.localhost:5091/empresas/nueva
+
+
+4. TIENDA VERDE (color #2E7D32)
+-------------------------------
+    Tienda (cliente):   http://verde.localhost:5091
+    Panel:              http://verde.localhost:5091/admin
+    Pagos por validar:  http://verde.localhost:5091/admin/pagos
+
+    Administrador (valida pagos):
+        Usuario:    admin@verde.local
+        Contraseña: Admin123!
+
+    Empleado (catálogo, inventario y despacho; NO valida pagos):
+        Usuario:    staff@verde.local
+        Contraseña: Admin123!
+
+    Cliente (compra y ve sus pedidos en "Mi cuenta"):
+        Usuario:    cliente@verde.local
+        Contraseña: Admin123!
+        Mi cuenta:  http://verde.localhost:5091/mi-cuenta
+        Registro:   http://verde.localhost:5091/cuenta/registro
+
+
+5. TIENDA ROJA (color #C62828)
+------------------------------
+    Tienda (cliente):   http://rojo.localhost:5091
+    Panel:              http://rojo.localhost:5091/admin
+    Pagos por validar:  http://rojo.localhost:5091/admin/pagos
+
+    Administrador (valida pagos):
+        Usuario:    admin@rojo.local
+        Contraseña: Admin123!
+
+    Empleado (catálogo, inventario y despacho; NO valida pagos):
+        Usuario:    staff@rojo.local
+        Contraseña: Admin123!
+
+    Cliente (compra y ve sus pedidos en "Mi cuenta"):
+        Usuario:    cliente@rojo.local
+        Contraseña: Admin123!
+        Mi cuenta:  http://rojo.localhost:5091/mi-cuenta
+        Registro:   http://rojo.localhost:5091/cuenta/registro
+
+
+6. OTRAS URLS
+-------------
+    Landing de la plataforma:  http://localhost:5091
+    API REST:                  http://localhost:5102
+    Ejemplos de la API:        src/CgShop.Api/CgShop.Api.http
+        (en la API la tienda se indica con el header  X-Tenant: verde)
+
+
+7. BASE DE DATOS
+----------------
+    Servidor:  (localdb)\MSSQLLocalDB
+    Base:      CgShop
+    Conexión:  Server=(localdb)\MSSQLLocalDB;Database=CgShop;Trusted_Connection=True;TrustServerCertificate=True
+
+
+8. NOTAS
+--------
+- Usar siempre el subdominio (verde.localhost, admin.localhost), no 127.0.0.1:
+  la tienda se identifica por el subdominio.
+- Cada usuario solo puede iniciar sesión en su propio subdominio
+  (admin@verde.local no entra en rojo.localhost).
+- Para comprar hay que iniciar sesión o crear una cuenta (el checkout redirige al login).
+- Al iniciar sesión: propietario/empleado -> panel /admin ; cliente -> /mi-cuenta
+  (o vuelve al checkout si venía de ahí).
+- Los pedidos demo antiguos no pertenecen a ningún cliente; los pedidos nuevos
+  aparecen en "Mi cuenta" del cliente que los hizo.
+- La sesión se cierra tras 15 minutos sin actividad (aviso 1 minuto antes).
+  Configurable en src/CgShop.Web/appsettings.json -> "Session": { "IdleTimeoutMinutes": 15 }
+- Si el navegador no abre *.localhost, usar *.lvh.me
+  (por ejemplo http://verde.lvh.me:5091).
+- Las empresas creadas desde el Super Admin quedan en http://<subdominio>.localhost:5091
+  con el usuario administrador definido al crearlas.
