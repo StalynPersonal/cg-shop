@@ -53,7 +53,7 @@ public sealed class ProductAdminService(
         var items = await query.OrderBy(p => p.Name).Skip((page - 1) * pageSize).Take(pageSize)
             .Select(p => new ProductAdminRowDto(p.Id, p.Name, p.Brand, p.Category, p.IsActive, p.Variants.Count,
                 p.Variants.Sum(v => v.StockOnHand), p.Variants.Sum(v => v.StockReserved),
-                p.Variants.Min(v => (decimal?)v.Price)))
+                p.Variants.Min(v => (decimal?)v.Price), p.TrendingRank != null, p.NewArrivalsRank != null))
             .ToListAsync(ct);
         return new PagedResult<ProductAdminRowDto>(items, total, page, pageSize);
     }

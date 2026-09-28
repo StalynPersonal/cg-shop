@@ -27,6 +27,8 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasIndex(p => new { p.TenantId, p.Slug }).IsUnique();
         b.HasIndex(p => new { p.TenantId, p.Category, p.IsActive });
         b.HasIndex(p => new { p.TenantId, p.Audience, p.IsActive });
+        b.HasIndex(p => new { p.TenantId, p.TrendingRank });
+        b.HasIndex(p => new { p.TenantId, p.NewArrivalsRank });
 
         // Atributos específicos por categoría (notas olfativas, material...) como JSON.
         b.Property(p => p.Attributes)

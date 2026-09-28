@@ -21,6 +21,7 @@ public sealed record NoteRequest(string? Note);
 public sealed record StockAdjustRequest(int Delta, string Reason);
 public sealed record ImageColorRequest(string? Color);
 public sealed record CategoryChangeRequest(ProductCategory Category);
+public sealed record FeaturedRequest(FeaturedSection Section, bool Featured);
 public sealed record CreateProductRequest(ProductUpsertDto Product, List<VariantUpsertDto> Variants);
 
 public static class AuthEndpoints
@@ -288,6 +289,23 @@ public static class AdminEndpoints
             await settings.UpdatePaymentSettingsAsync(body, http.User.ToActor(), ct);
             return Results.NoContent();
         }).RequireAuthorization(ApiPolicies.TenantAdmin);
+
+        // Destacados del inicio (solo propietario).
+        var featured = admin.MapGroup("/featured").RequireAuthorization(ApiPolicies.TenantAdmin);
+        featured.MapGet("/{section}", (FeaturedSection section, FeaturedService service, HttpContext http, CancellationToken ct) =>
+            service.ListAsync(section, http.User.ToActor(), ct));
+        featured.MapPut("/products/{id:guid}", async (Guid id, FeaturedRequest body, FeaturedService service, HttpContext http,
+            CancellationToken ct) =>
+        {
+            await service.SetAsync(id, body.Section, body.Featured, http.User.ToActor(), ct);
+            return Results.NoContent();
+        });
+        featured.MapPost("/products/{id:guid}/move", async (Guid id, FeaturedSection section, int offset, FeaturedService service,
+            HttpContext http, CancellationToken ct) =>
+        {
+            await service.MoveAsync(id, section, offset, http.User.ToActor(), ct);
+            return Results.NoContent();
+        });
 
         // Reportes por rango de fechas (solo propietario). from/to: yyyy-MM-dd, días en hora de RD.
         admin.MapGet("/reports/sales", (DateOnly from, DateOnly to, ReportService reports, HttpContext http,

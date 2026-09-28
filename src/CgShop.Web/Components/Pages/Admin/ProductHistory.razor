@@ -65,7 +65,8 @@
     {
         ProductChangeType.CategoryChanged or ProductChangeType.Deleted or ProductChangeType.VariantRemoved => Color.Warning,
         ProductChangeType.PriceChanged => Color.Info,
-        ProductChangeType.Created or ProductChangeType.VariantAdded or ProductChangeType.Activated => Color.Success,
+        ProductChangeType.Created or ProductChangeType.VariantAdded or ProductChangeType.Activated
+            or ProductChangeType.Featured => Color.Success,
         _ => Color.Default
     };
 }

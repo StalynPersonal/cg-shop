@@ -1,5 +1,6 @@
 @page "/admin/productos"
 @inject ProductAdminService Products
+@inject FeaturedService Featured
 
 <PageTitle>Productos · @Host.Tenant?.Name</PageTitle>
 <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-4">
@@ -41,6 +42,30 @@
         </TemplateColumn>
         <TemplateColumn Title="Desde" Sortable="false">
             <CellTemplate>@(context.Item.MinPrice is { } p ? Ui.Money(p, Currency) : "—")</CellTemplate>
+        </TemplateColumn>
+        <TemplateColumn Title="Inicio" Sortable="false">
+            <CellTemplate>
+                <AuthorizeView Policy="@Policies.TenantAdmin" Context="auth">
+                    <Authorized>
+                        <MudTooltip Text="@(context.Item.InTrending ? "Quitar de Tendencias" : "Destacar en Tendencias")">
+                            <MudIconButton Icon="@Icons.Material.Filled.Whatshot" Size="Size.Small"
+                                           Color="@(context.Item.InTrending ? Color.Warning : Color.Default)"
+                                           Class="@(context.Item.InTrending ? "" : "cg-off")" data-testid="toggle-trending"
+                                           OnClick="() => ToggleFeatured(context.Item, FeaturedSection.Trending, !context.Item.InTrending)" />
+                        </MudTooltip>
+                        <MudTooltip Text="@(context.Item.InNewArrivals ? "Quitar de Novedades" : "Destacar en Novedades")">
+                            <MudIconButton Icon="@Icons.Material.Filled.NewReleases" Size="Size.Small"
+                                           Color="@(context.Item.InNewArrivals ? Color.Info : Color.Default)"
+                                           Class="@(context.Item.InNewArrivals ? "" : "cg-off")" data-testid="toggle-new"
+                                           OnClick="() => ToggleFeatured(context.Item, FeaturedSection.NewArrivals, !context.Item.InNewArrivals)" />
+                        </MudTooltip>
+                    </Authorized>
+                    <NotAuthorized>
+                        @if (context.Item.InTrending) { <MudIcon Icon="@Icons.Material.Filled.Whatshot" Size="Size.Small" Color="Color.Warning" /> }
+                        @if (context.Item.InNewArrivals) { <MudIcon Icon="@Icons.Material.Filled.NewReleases" Size="Size.Small" Color="Color.Info" /> }
+                    </NotAuthorized>
+                </AuthorizeView>
+            </CellTemplate>
         </TemplateColumn>
         <TemplateColumn Title="Activo" Sortable="false">
             <CellTemplate>
@@ -90,6 +115,13 @@
     {
         if (await Snackbar.TryAsync(() => Products.SetActiveAsync(row.Id, active, Actor),
                 active ? "Producto publicado." : "Producto oculto de la tienda."))
+            await _grid.ReloadServerData();
+    }
+
+    private async Task ToggleFeatured(ProductAdminRowDto row, FeaturedSection section, bool featured)
+    {
+        if (await Snackbar.TryAsync(() => Featured.SetAsync(row.Id, section, featured, Actor),
+                featured ? $"{row.Name} destacado en {section.DisplayName()}." : $"{row.Name} quitado de {section.DisplayName()}."))
             await _grid.ReloadServerData();
     }
 

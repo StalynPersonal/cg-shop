@@ -12,7 +12,9 @@ public enum ProductChangeType
     VariantAdded = 6,
     VariantRemoved = 7,
     PriceChanged = 8,
-    Deleted = 9
+    Deleted = 9,
+    Featured = 10,
+    Unfeatured = 11
 }
 
 public static class ProductChangeTypeExtensions
@@ -28,6 +30,8 @@ public static class ProductChangeTypeExtensions
         ProductChangeType.VariantRemoved => "Variante eliminada",
         ProductChangeType.PriceChanged => "Cambio de precio",
         ProductChangeType.Deleted => "Eliminado",
+        ProductChangeType.Featured => "Destacado",
+        ProductChangeType.Unfeatured => "Quitado de destacados",
         _ => type.ToString()
     };
 }

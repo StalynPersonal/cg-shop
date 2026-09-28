@@ -539,3 +539,18 @@ html, body {
     background: #fff;
 }
 .cg-photo-strip img.main { border: 2px solid var(--mud-palette-primary); }
+
+/* Destacados del inicio */
+.cg-featured-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--mud-palette-lines-default);
+}
+.cg-featured-row:last-child { border-bottom: 0; }
+.cg-featured-pos { width: 20px; text-align: center; font-weight: 700; color: var(--mud-palette-primary); }
+.cg-featured-thumb { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex: 0 0 40px; border: 1px solid var(--mud-palette-lines-default); }
+.cg-featured-icon { display: inline-flex; align-items: center; justify-content: center; background: var(--mud-palette-background-gray); }
+.cg-featured-name { flex: 1; min-width: 0; }
+.cg-off { opacity: .35; }

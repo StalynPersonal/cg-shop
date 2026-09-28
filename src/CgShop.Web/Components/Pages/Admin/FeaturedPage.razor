@@ -1,0 +1,130 @@
+@page "/admin/destacados"
+@attribute [Authorize(Policy = Policies.TenantAdmin)]
+@inject FeaturedService Featured
+@inject ProductAdminService Products
+
+<PageTitle>Destacados · @Host.Tenant?.Name</PageTitle>
+<MudText Typo="Typo.h4">Destacados</MudText>
+<MudText Class="mud-text-secondary mb-4">
+    Elija qué productos aparecen primero en el inicio de la tienda y en qué orden (hasta @FeaturedSectionExtensions.MaxPerSection
+    por sección). El resto de cada sección se completa solo: Tendencias con los más vendidos y Novedades con los más recientes.
+</MudText>
+
+<MudGrid>
+    @foreach (var section in Enum.GetValues<FeaturedSection>())
+    {
+        var items = _lists.GetValueOrDefault(section) ?? [];
+        <MudItem xs="12" md="6">
+            <MudPaper Class="pa-4" Outlined="true" Style="height:100%" data-testid="@($"featured-{section}")">
+                <div class="d-flex align-center justify-space-between mb-2">
+                    <MudText Typo="Typo.h6">
+                        <MudIcon Icon="@IconFor(section)" Color="Color.Primary" Style="vertical-align:middle" /> @section.DisplayName()
+                    </MudText>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@items.Count/@FeaturedSectionExtensions.MaxPerSection</MudChip>
+                </div>
+
+                <MudAutocomplete T="ProductAdminRowDto" Label="Agregar producto" Placeholder="Buscar por nombre, marca o SKU"
+                                 SearchFunc="(text, ct) => SearchAsync(section, text, ct)" ToStringFunc="p => p?.Name"
+                                 ValueChanged="p => AddAsync(section, p)" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                 ResetValueOnEmptyText="true" Clearable="true" DebounceInterval="300" MinCharacters="1"
+                                 Disabled="@(items.Count >= FeaturedSectionExtensions.MaxPerSection)"
+                                 AdornmentIcon="@Icons.Material.Filled.Search" data-testid="@($"featured-add-{section}")">
+                    <ItemTemplate Context="p">
+                        <div class="d-flex align-center gap-2">
+                            <MudIcon Icon="@Ui.CategoryIcon(p.Category)" Size="Size.Small" />
+                            <span>@p.Name</span>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@p.Brand</MudText>
+                        </div>
+                    </ItemTemplate>
+                </MudAutocomplete>
+
+                @if (items.Count == 0)
+                {
+                    <MudText Class="mud-text-secondary mt-4">
+                        Sin destacados: la sección se llena automáticamente.
+                    </MudText>
+                }
+                else
+                {
+                    <div class="mt-3">
+                        @foreach (var (item, index) in items.Select((x, i) => (x, i)))
+                        {
+                            <div class="cg-featured-row" data-testid="featured-item">
+                                <span class="cg-featured-pos">@(index + 1)</span>
+                                @if (item.ImageUrl is not null)
+                                {
+                                    <img src="@item.ImageUrl" alt="" class="cg-featured-thumb" />
+                                }
+                                else
+                                {
+                                    <span class="cg-featured-thumb cg-featured-icon"><MudIcon Icon="@Ui.CategoryIcon(item.Category)" Size="Size.Small" /></span>
+                                }
+                                <div class="cg-featured-name">
+                                    <MudLink Href="@($"/admin/productos/{item.ProductId}")" Typo="Typo.body2">@item.Name</MudLink>
+                                    <MudText Typo="Typo.caption" Class="mud-text-secondary d-block">
+                                        @item.Category.DisplayName()@(item.Brand is null ? "" : $" · {item.Brand}")
+                                    </MudText>
+                                    @if (!item.VisibleInStore)
+                                    {
+                                        <MudText Typo="Typo.caption" Color="Color.Warning" Class="d-block">
+                                            No se muestra: @(item.IsActive ? "no tiene variantes" : "está inactivo")
+                                        </MudText>
+                                    }
+                                </div>
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" Disabled="@(index == 0)"
+                                               OnClick="() => MoveAsync(section, item, -1)" aria-label="Subir" />
+                                <MudIconButton Icon="@Icons.Material.Filled.ArrowDownward" Size="Size.Small"
+                                               Disabled="@(index == items.Count - 1)" OnClick="() => MoveAsync(section, item, 1)" aria-label="Bajar" />
+                                <MudIconButton Icon="@Icons.Material.Filled.Close" Size="Size.Small" Color="Color.Error"
+                                               OnClick="() => RemoveAsync(section, item)" aria-label="Quitar" data-testid="featured-remove" />
+                            </div>
+                        }
+                    </div>
+                }
+            </MudPaper>
+        </MudItem>
+    }
+</MudGrid>
+
+@code {
+    private readonly Dictionary<FeaturedSection, IReadOnlyList<FeaturedProductDto>> _lists = [];
+
+    protected override async Task OnAdminInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        foreach (var section in Enum.GetValues<FeaturedSection>())
+            _lists[section] = await Featured.ListAsync(section, Actor);
+    }
+
+    private static string IconFor(FeaturedSection section) =>
+        section == FeaturedSection.Trending ? Icons.Material.Filled.Whatshot : Icons.Material.Filled.NewReleases;
+
+    private async Task<IEnumerable<ProductAdminRowDto>> SearchAsync(FeaturedSection section, string? text, CancellationToken ct)
+    {
+        var already = (_lists.GetValueOrDefault(section) ?? []).Select(f => f.ProductId).ToHashSet();
+        var page = await Products.ListAsync(text, null, 1, 15, ct);
+        return page.Items.Where(p => !already.Contains(p.Id));
+    }
+
+    private async Task AddAsync(FeaturedSection section, ProductAdminRowDto? product)
+    {
+        if (product is null)
+            return;
+        if (await Snackbar.TryAsync(() => Featured.SetAsync(product.Id, section, true, Actor),
+                $"{product.Name} destacado en {section.DisplayName()}."))
+            await LoadAsync();
+    }
+
+    private async Task RemoveAsync(FeaturedSection section, FeaturedProductDto item)
+    {
+        if (await Snackbar.TryAsync(() => Featured.SetAsync(item.ProductId, section, false, Actor)))
+            await LoadAsync();
+    }
+
+    private async Task MoveAsync(FeaturedSection section, FeaturedProductDto item, int offset)
+    {
+        if (await Snackbar.TryAsync(() => Featured.MoveAsync(item.ProductId, section, offset, Actor)))
+            await LoadAsync();
+    }
+}

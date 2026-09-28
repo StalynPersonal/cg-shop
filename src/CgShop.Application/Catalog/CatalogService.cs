@@ -87,8 +87,8 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
     }
 
     /// <summary>
-    /// Productos en tendencia: los más vendidos (unidades) en los últimos <paramref name="days"/> días.
-    /// Si hay pocas ventas, se completa con las novedades para que la sección no quede vacía.
+    /// Productos en tendencia: primero los destacados a mano por el propietario (en su orden); luego los más
+    /// vendidos (unidades) de los últimos <paramref name="days"/> días; si faltan, las novedades.
     /// </summary>
     public async Task<IReadOnlyList<ProductCardDto>> GetTrendingAsync(DateTime nowUtc, int take = 12, int days = 30,
         CancellationToken ct = default)
@@ -97,8 +97,14 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
         var since = nowUtc.AddDays(-days);
         await using var db = dbFactory.CreateDbContext();
 
+        var result = await FeaturedCardsAsync(db, FeaturedSection.Trending, take, ct);
+        if (result.Count >= take)
+            return result;
+
+        var chosen = result.Select(c => c.Id).ToList();
         var ranking = await db.OrderItems
             .Where(i => db.Orders.Any(o => o.Id == i.OrderId && OrderStateMachine.PaidStatuses.Contains(o.Status) && o.CreatedAtUtc >= since))
+            .Where(i => !chosen.Contains(i.ProductId))
             .GroupBy(i => i.ProductId) // copia en la línea: cuenta aunque la variante ya no exista
             .Select(g => new { ProductId = g.Key, Units = g.Sum(i => i.Quantity) })
             .OrderByDescending(x => x.Units)
@@ -106,15 +112,45 @@ public sealed class CatalogService(IAppDbContextFactory dbFactory)
             .ToListAsync(ct);
 
         var ids = ranking.Select(r => r.ProductId).ToList();
-        var bestSellers = (await CardsAsync(db.Products.Where(p => ids.Contains(p.Id)), ct))
-            .OrderBy(c => ids.IndexOf(c.Id)).Take(take).ToList();
-        if (bestSellers.Count >= take)
-            return bestSellers;
+        result.AddRange((await CardsAsync(Visible(db).Where(p => ids.Contains(p.Id)), ct))
+            .OrderBy(c => ids.IndexOf(c.Id)).Take(take - result.Count));
+        return await FillWithNewestAsync(db, result, take, ct);
+    }
 
-        var chosen = bestSellers.Select(c => c.Id).ToList();
-        var newest = await CardsAsync(db.Products.Where(p => !chosen.Contains(p.Id)).OrderByDescending(p => p.Id)
-            .Take(take - bestSellers.Count), ct);
-        return bestSellers.Concat(newest.OrderByDescending(c => c.Id)).ToList();
+    /// <summary>Novedades: primero las destacadas a mano (en su orden); luego los productos creados más recientemente.</summary>
+    public async Task<IReadOnlyList<ProductCardDto>> GetNewArrivalsAsync(int take = 8, CancellationToken ct = default)
+    {
+        take = Math.Clamp(take, 1, 48);
+        await using var db = dbFactory.CreateDbContext();
+        var result = await FeaturedCardsAsync(db, FeaturedSection.NewArrivals, take, ct);
+        return await FillWithNewestAsync(db, result, take, ct);
+    }
+
+    private static IQueryable<Product> Visible(IAppDbContext db) =>
+        db.Products.Where(p => p.IsActive && p.Variants.Any());
+
+    private static async Task<List<ProductCardDto>> FeaturedCardsAsync(IAppDbContext db, FeaturedSection section,
+        int take, CancellationToken ct)
+    {
+        var ranks = section == FeaturedSection.Trending
+            ? await Visible(db).Where(p => p.TrendingRank != null).Select(p => new { p.Id, Rank = p.TrendingRank!.Value }).ToListAsync(ct)
+            : await Visible(db).Where(p => p.NewArrivalsRank != null).Select(p => new { p.Id, Rank = p.NewArrivalsRank!.Value }).ToListAsync(ct);
+        var order = ranks.OrderBy(r => r.Rank).Take(take).Select(r => r.Id).ToList();
+        return (await CardsAsync(db.Products.Where(p => order.Contains(p.Id)), ct))
+            .OrderBy(c => order.IndexOf(c.Id)).ToList();
+    }
+
+    /// <summary>Completa con los productos más nuevos que aún no estén en la lista (Guid v7: orden cronológico).</summary>
+    private static async Task<List<ProductCardDto>> FillWithNewestAsync(IAppDbContext db, List<ProductCardDto> result,
+        int take, CancellationToken ct)
+    {
+        if (result.Count >= take)
+            return result;
+        var chosen = result.Select(c => c.Id).ToList();
+        var newest = await CardsAsync(Visible(db).Where(p => !chosen.Contains(p.Id)).OrderByDescending(p => p.Id)
+            .Take(take - result.Count), ct);
+        result.AddRange(newest.OrderByDescending(c => c.Id));
+        return result;
     }
 
     /// <summary>Tarjetas de productos activos con variantes (foto principal, precio mínimo y disponible).</summary>

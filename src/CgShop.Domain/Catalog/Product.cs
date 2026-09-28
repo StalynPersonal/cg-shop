@@ -21,6 +21,26 @@ public sealed class Product : Entity, ITenantEntity
     /// <summary>Hombre, Mujer, Niños o Unisex (para las secciones de la tienda).</summary>
     public ProductAudience Audience { get; private set; } = ProductAudience.Unisex;
 
+    /// <summary>Posición como destacado en "Productos en tendencia" (null = no destacado).</summary>
+    public int? TrendingRank { get; private set; }
+
+    /// <summary>Posición como destacado en "Novedades" (null = no destacado).</summary>
+    public int? NewArrivalsRank { get; private set; }
+
+    public int? FeaturedRank(FeaturedSection section) =>
+        section == FeaturedSection.Trending ? TrendingRank : NewArrivalsRank;
+
+    /// <summary>Pone o quita al producto de una sección destacada. La posición la asigna el servicio.</summary>
+    public void SetFeaturedRank(FeaturedSection section, int? rank)
+    {
+        if (rank is < 0)
+            throw new DomainException("Posición inválida.");
+        if (section == FeaturedSection.Trending)
+            TrendingRank = rank;
+        else
+            NewArrivalsRank = rank;
+    }
+
     /// <summary>
     /// Atributos específicos de la categoría (notas olfativas, material, tipo de movimiento...).
     /// Se persiste como columna JSON.

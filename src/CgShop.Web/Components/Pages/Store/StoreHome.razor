@@ -37,12 +37,12 @@ else
 }
 else
 {
-    <ProductGrid Products="_products.Items" Currency="@Host.Currency" />
+    <ProductGrid Products="_products" Currency="@Host.Currency" />
 }
 
 @code {
     [CascadingParameter] private HostContext Host { get; set; } = default!;
-    private PagedResult<ProductCardDto>? _products;
+    private IReadOnlyList<ProductCardDto>? _products;
     private IReadOnlyList<ProductCardDto> _trending = [];
     private IReadOnlyList<CgShop.Application.Marketing.BannerDto> _banners = [];
 
@@ -50,6 +50,6 @@ else
     {
         _banners = await BannerService.ListActiveAsync();
         _trending = await Catalog.GetTrendingAsync(Clock.GetUtcNow().UtcDateTime);
-        _products = await Catalog.SearchAsync(new CatalogQuery(PageSize: 8));
+        _products = await Catalog.GetNewArrivalsAsync(8);
     }
 }

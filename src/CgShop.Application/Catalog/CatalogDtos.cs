@@ -78,7 +78,9 @@ public sealed record ProductAdminRowDto(
     int VariantCount,
     int StockOnHand,
     int StockReserved,
-    decimal? MinPrice);
+    decimal? MinPrice,
+    bool InTrending = false,
+    bool InNewArrivals = false);
 
 public sealed class ProductUpsertDto
 {
