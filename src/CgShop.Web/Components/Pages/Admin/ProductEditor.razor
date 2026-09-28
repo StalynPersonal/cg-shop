@@ -65,6 +65,39 @@ else
         </MudItem>
 
         <MudItem xs="12" md="6">
+            @if (!IsNew)
+            {
+                @* Vista previa compacta: solo para confirmar qué fotos se subieron (se administran más abajo). *@
+                <MudPaper Class="pa-3 mb-4" Outlined="true" data-testid="photo-strip">
+                    <div class="d-flex align-center justify-space-between gap-2">
+                        <MudText Typo="Typo.subtitle2">Fotos (@_images.Count)</MudText>
+                        <MudLink Href="@($"/admin/productos/{Id}#fotos")" Typo="Typo.caption">@(_images.Count == 0 ? "Agregar fotos" : "Administrar")</MudLink>
+                    </div>
+                    @if (_images.Count > 0)
+                    {
+                        <div class="cg-photo-strip mt-2">
+                            @foreach (var image in _images)
+                            {
+                                <img src="@image.Url" alt="Foto @(image.SortOrder + 1)" loading="lazy" data-testid="photo-thumb"
+                                     class="@(image.IsMain ? "main" : "")" title="@(image.IsMain ? "Principal" : image.Color ?? "")" />
+                            }
+                        </div>
+                    }
+                    else if (!string.IsNullOrWhiteSpace(_product.ImageUrl))
+                    {
+                        <div class="d-flex align-center gap-2 mt-2">
+                            <div class="cg-photo-strip"><img src="@_product.ImageUrl" alt="Imagen externa" /></div>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">Sin fotos subidas: se usa la imagen externa.</MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <MudText Typo="Typo.caption" Class="mud-text-secondary d-block mt-1" data-testid="no-photos">
+                            Sin fotos: en la tienda se mostrará el ícono de la categoría.
+                        </MudText>
+                    }
+                </MudPaper>
+            }
             <MudPaper Class="pa-6" Outlined="true">
                 <MudText Typo="Typo.h6">Variantes</MudText>
                 <MudText Typo="Typo.caption" Class="mud-text-secondary">
@@ -130,7 +163,7 @@ else
     }
     else
     {
-        <ProductGalleryEditor ProductId="Id!.Value" Colors="@(_variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList())" />
+        <ProductGalleryEditor ProductId="Id!.Value" ImagesChanged="images => _images = images" Colors="@(_variants.Where(v => v.Color != null).Select(v => v.Color!).Distinct().ToList())" />
         <AuthorizeView Policy="@Policies.TenantAdmin">
             <ProductHistory ProductId="Id!.Value" Version="_historyVersion" />
         </AuthorizeView>
@@ -148,6 +181,7 @@ else
     private ProductUpsertDto _product = new();
     private IReadOnlyList<VariantDto> _variants = [];
     private int _historyVersion;
+    private IReadOnlyList<ProductImageDto> _images = [];
     private readonly List<VariantUpsertDto> _newVariants = [];
     private VariantUpsertDto _variant = new();
     private string? _newAttrKey;

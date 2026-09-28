@@ -527,3 +527,15 @@ html, body {
     .cg-kpi-value { font-size: 1.15rem; }
     .cg-report-picker { flex-basis: 100%; }
 }
+
+/* Vista previa compacta de fotos en el editor de producto. */
+.cg-photo-strip { display: flex; flex-wrap: wrap; gap: 6px; }
+.cg-photo-strip img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    border: 1px solid var(--mud-palette-lines-default);
+    background: #fff;
+}
+.cg-photo-strip img.main { border: 2px solid var(--mud-palette-primary); }

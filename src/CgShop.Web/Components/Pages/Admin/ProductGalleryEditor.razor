@@ -3,7 +3,7 @@
 @inject IOptions<CatalogOptions> CatalogOptions
 @using Microsoft.Extensions.Options
 
-<MudPaper Class="pa-6 mt-4" Outlined="true" data-testid="gallery-editor">
+<MudPaper Class="pa-6 mt-4" Outlined="true" data-testid="gallery-editor" id="fotos">
     <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Wrap="Wrap.Wrap">
         <MudStack Spacing="0">
             <MudText Typo="Typo.h6">Fotos (@_images.Count/@Opts.MaxImagesPerProduct)</MudText>
@@ -89,6 +89,9 @@
 @code {
     [Parameter, EditorRequired] public Guid ProductId { get; set; }
 
+    /// <summary>Avisa al editor cada vez que cambian las fotos (para la vista previa compacta).</summary>
+    [Parameter] public EventCallback<IReadOnlyList<ProductImageDto>> ImagesChanged { get; set; }
+
     /// <summary>Colores de las variantes, para asociar cada foto a uno.</summary>
     [Parameter] public IReadOnlyList<string> Colors { get; set; } = [];
 
@@ -109,7 +112,11 @@
         await LoadAsync();
     }
 
-    private async Task LoadAsync() => _images = await Images.ListAsync(ProductId);
+    private async Task LoadAsync()
+    {
+        _images = await Images.ListAsync(ProductId);
+        await ImagesChanged.InvokeAsync(_images);
+    }
 
     private async Task UploadAsync(IReadOnlyList<IBrowserFile>? files)
     {
